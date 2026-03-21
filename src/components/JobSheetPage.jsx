@@ -13,7 +13,7 @@ const JobSheetPage = ({ editData = null, isEdit = false }) => {
   const [modelList, setModelList] = useState([]);
   const navigate = useNavigate();
   const [jobSheetNo, setJobSheetNo] = useState("");
-  const [saving, setSaving] = useState(false); 
+  const [saving, setSaving] = useState(false);
   const API = import.meta.env.VITE_API_URL;
 
   /* ================= TIME ================= */
@@ -38,8 +38,8 @@ const JobSheetPage = ({ editData = null, isEdit = false }) => {
     } else {
       // 🆕 NEW MODE → localStorage
       axios.get(`${API}/api/jobsheets/next-number`)
-  .then(res => setJobSheetNo(res.data.next))
-  .catch(err => console.error(err));
+        .then(res => setJobSheetNo(res.data.next))
+        .catch(err => console.error(err));
     }
   }, [isEdit, editData]);
 
@@ -135,7 +135,7 @@ const JobSheetPage = ({ editData = null, isEdit = false }) => {
   const [spareItems, setSpareItems] = useState([]);
 
   const [sparePopup, setSparePopup] = useState(false);
-  
+
   const [paymentMode, setPaymentMode] = useState("");
   const [estimate, setEstimate] = useState("");
   const [repairDate, setRepairDate] = useState(today);
@@ -221,7 +221,7 @@ const JobSheetPage = ({ editData = null, isEdit = false }) => {
       return;
     }
     try {
-      
+
       const currentJobSheetNo = jobSheetNo;
 
       const formData = new FormData();
@@ -242,12 +242,12 @@ const JobSheetPage = ({ editData = null, isEdit = false }) => {
       );
 
       formData.append(
-  "createdBy",
-  JSON.stringify({
-    username: user?.username || "unknown",
-    role: user?.role || "user"
-  })
-);
+        "createdBy",
+        JSON.stringify({
+          username: user?.username || "unknown",
+          role: user?.role || "user"
+        })
+      );
 
       /* ================= DEVICE ================= */
       formData.append(
@@ -296,9 +296,9 @@ const JobSheetPage = ({ editData = null, isEdit = false }) => {
       );
 
       formData.append(
-  "spareItems",
-  JSON.stringify(spareItems)
-);
+        "spareItems",
+        JSON.stringify(spareItems)
+      );
 
       /* ================= ID PROOF ================= */
       formData.append("idProofType", idProofType);
@@ -320,9 +320,9 @@ const JobSheetPage = ({ editData = null, isEdit = false }) => {
 
       /* ================= JOB NUMBER INCREMENT ================= */
       // get next job number from DB
-axios.get(`${API}/api/jobsheets/next-number`)
-  .then(res => setJobSheetNo(res.data.next))
-  .catch(err => console.error(err));
+      axios.get(`${API}/api/jobsheets/next-number`)
+        .then(res => setJobSheetNo(res.data.next))
+        .catch(err => console.error(err));
 
       alert("Job Sheet Saved Successfully ✅");
 
@@ -387,11 +387,11 @@ axios.get(`${API}/api/jobsheets/next-number`)
     navigate("/jobsheet"); // go to fresh route
 
     // ✅ NEW JOB NUMBER
-    
-  axios.get(`${API}/api/jobsheets/next-number`)
-    .then(res => setJobSheetNo(res.data.next))
-    .catch(err => console.error(err));
-};
+
+    axios.get(`${API}/api/jobsheets/next-number`)
+      .then(res => setJobSheetNo(res.data.next))
+      .catch(err => console.error(err));
+  };
 
   /* ================= EDIT DATA ================= */
 
@@ -413,7 +413,7 @@ axios.get(`${API}/api/jobsheets/next-number`)
     setWarranty(editData.device?.warranty || "");
     setPattern(editData.device?.pattern || "");
     setIdProofType(editData.device?.idProofType || "");
-   setIdProofPreview(editData.idProofImage || "");
+    setIdProofPreview(editData.idProofImage || "");
     setMobileStatus(editData.device?.mobileStatus || "");
 
     // CHECKBOX ARRAYS
@@ -496,16 +496,16 @@ axios.get(`${API}/api/jobsheets/next-number`)
           {/* STATUS */}
           <div className="col-md-2">
             <select
-  className="form-select form-select-sm"
-  value={searchStatus}
-  onChange={(e) => setSearchStatus(e.target.value)}
->
-  <option value="">All Status</option>
-  <option value="Received">Received</option>
-  <option value="Pending">Pending</option>
-  <option value="Delivered">Delivered</option>
-  <option value="Delivered NR/NA">Delivered NR/NA</option>
-</select>
+              className="form-select form-select-sm"
+              value={searchStatus}
+              onChange={(e) => setSearchStatus(e.target.value)}
+            >
+              <option value="">All Status</option>
+              <option value="Received">Received</option>
+              <option value="Pending">Pending</option>
+              <option value="Delivered">Delivered</option>
+              <option value="Delivered NR/NA">Delivered NR/NA</option>
+            </select>
           </div>
 
           {/* FROM DATE */}
@@ -678,10 +678,10 @@ axios.get(`${API}/api/jobsheets/next-number`)
                   <option value="">Select Make</option>
 
                   {makeList.map((mk, i) => (
-  <option key={i} value={mk.name || mk}>
-    {mk.name || mk}
-  </option>
-))}
+                    <option key={i} value={mk.name || mk}>
+                      {mk.name || mk}
+                    </option>
+                  ))}
 
                   <option value="__custom">Other (Add New)</option>
                 </select>
@@ -743,7 +743,7 @@ axios.get(`${API}/api/jobsheets/next-number`)
                 <select
                   className="form-select form-select-sm"
                   value={mobileStatus}
-onChange={(e) => setMobileStatus(e.target.value)} 
+                  onChange={(e) => setMobileStatus(e.target.value)}
                 >
                   <option value="">All Status</option>
                   <option value="Received">Received</option>
@@ -800,20 +800,20 @@ onChange={(e) => setMobileStatus(e.target.value)}
                   accept="image/*"
                   className="form-control form-control-sm"
                   onChange={(e) => {
-  const file = e.target.files[0];
-  setIdProofImage(file);
+                    const file = e.target.files[0];
+                    setIdProofImage(file);
 
-  if (file) {
-    setIdProofPreview(URL.createObjectURL(file));
-  }
-}}
+                    if (file) {
+                      setIdProofPreview(URL.createObjectURL(file));
+                    }
+                  }}
                   disabled={
                     idProofType === "ID Not Required" ||
                     idProofType === "Dealer Collected"
                   }
                 />
 
-                
+
               </div>
               {/* {idProofPreview && (
   <img
@@ -847,10 +847,10 @@ onChange={(e) => setMobileStatus(e.target.value)}
                       <option value="">Select Engineer</option>
 
                       {engineerList.map((e, i) => (
-  <option key={i} value={e.name || e}>
-    {e.name || e}
-  </option>
-))}
+                        <option key={i} value={e.name || e}>
+                          {e.name || e}
+                        </option>
+                      ))}
                     </select>
                   </div>
 
@@ -875,10 +875,10 @@ onChange={(e) => setMobileStatus(e.target.value)}
                       <option value="">Select Drawer</option>
 
                       {drawerList.map((d, i) => (
-  <option key={i} value={d.name || d}>
-    {d.name || d}
-  </option>
-))}
+                        <option key={i} value={d.name || d}>
+                          {d.name || d}
+                        </option>
+                      ))}
                     </select>
                   </div>
 
@@ -901,15 +901,15 @@ onChange={(e) => setMobileStatus(e.target.value)}
 
 
                 <div className="col-md-3">
-                 <input
-  type="text"
-  className="form-control form-control-sm"
-  placeholder="Spare Charges"
-  value={spareCharge}
-  readOnly
-  onClick={() => setSparePopup(true)}
-  style={{ cursor: "pointer", background: "#f8f9fa" }}
-/>
+                  <input
+                    type="text"
+                    className="form-control form-control-sm"
+                    placeholder="Spare Charges"
+                    value={spareCharge}
+                    readOnly
+                    onClick={() => setSparePopup(true)}
+                    style={{ cursor: "pointer", background: "#f8f9fa" }}
+                  />
                 </div>
 
 
@@ -1106,11 +1106,11 @@ onChange={(e) => setMobileStatus(e.target.value)}
           </button>
 
           <button
-  className="btn btn-secondary btn-sm"
-  onClick={() => navigate("/home")}
->
-  Home
-</button>
+            className="btn btn-secondary btn-sm"
+            onClick={() => navigate("/home")}
+          >
+            Home
+          </button>
 
           {/* NEW */}
           <button
@@ -1129,13 +1129,13 @@ onChange={(e) => setMobileStatus(e.target.value)}
         />
       )}
 
-          {sparePopup && (
-  <SparePopup
-    onClose={() => setSparePopup(false)}
-    setSpareCharge={setSpareCharge}
-    setSpareItems={setSpareItems}
-  />
-)}
+      {sparePopup && (
+        <SparePopup
+          onClose={() => setSparePopup(false)}
+          setSpareCharge={setSpareCharge}
+          setSpareItems={setSpareItems}
+        />
+      )}
 
       <div style={{ height: "80px" }} />
     </div>

@@ -4,6 +4,30 @@
   padding: 0;
   text-align: left;
 }
+
+/* Placeholder light grey */
+.form-control::placeholder {
+  color: #adb5bd !important;
+  opacity: 1;
+}
+
+/* Typed text dark */
+.form-control {
+  color: #212529 !important;
+}
+
+/* When user types → more highlight */
+.form-control:not(:placeholder-shown) {
+  color: #000 !important;
+  font-weight: 500;
+}
+textarea::placeholder {
+  color: #adb5bd !important;
+}
+
+textarea {
+  color: #212529 !important;
+}
 @media print {
   .no-print {
     display: none !important;
