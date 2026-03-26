@@ -226,12 +226,14 @@ const Home = () => {
       }}
     />
 
-    <div
-      onClick={() => navigate("/report")}
-      className="px-4 py-2 cursor-pointer text-slate-300 hover:text-indigo-400 text-sm"
-    >
-      Report
-    </div>
+   {role === "admin" && (
+  <div
+    onClick={() => navigate("/report")}
+    className="px-4 py-2 cursor-pointer text-slate-300 hover:text-indigo-400 text-sm"
+  >
+    Report
+  </div>
+)}
 
     <div
       onClick={handleLogout}
@@ -312,16 +314,17 @@ const Home = () => {
       Drawer
     </div>
 
-    {/* Report */}
-    <div
-      onClick={() => {
-        navigate("/report");
-        setMobileMenu(false);
-      }}
-      className="px-4 py-3 text-slate-300 border-b border-white/5"
-    >
-      Report
-    </div>
+   {role === "admin" && (
+  <div
+    onClick={() => {
+      navigate("/report");
+      setMobileMenu(false);
+    }}
+    className="px-4 py-3 text-slate-300 border-b border-white/5"
+  >
+    Report
+  </div>
+)}
 
     {/* Logout */}
     <div
