@@ -115,7 +115,7 @@ const InvoiceBill = () => {
                     PHONE NO
                   </td>
                   <td>:</td>
-                  <td style={{ paddingLeft: "6px" }}>81222 73355</td>
+                  <td style={{ paddingLeft: "6px" }}>81222 73355 / 99409 73030</td>
                 </tr>
 
                 <tr>
@@ -147,7 +147,7 @@ const InvoiceBill = () => {
             </h2>
 
             <p style={{ fontSize: "14px", margin: 0 }}>
-              1st floor Anna Salai opp to Hot and cold restaurant pondicherry
+             242, Sinnaya Plaza, MG Road, Puducherry - 605001
             </p>
           </div>
         </div>
@@ -216,7 +216,7 @@ const InvoiceBill = () => {
         >
           <thead>
             <tr style={{ background: "#f3f3f3" }}>
-              {["Make", "Model", "IMEI", "Fault", "Service", "Spare"].map(
+              {["Make", "Model", "IMEI", "Fault", "Total"].map(
                 (h, i) => (
                   <th key={i} style={th}>
                     {h}
@@ -227,16 +227,18 @@ const InvoiceBill = () => {
           </thead>
 
           <tbody>
-            {items.map((item, i) => (
-              <tr key={i}>
-                <td style={td}>{item.make || "-"}</td>
-                <td style={td}>{item.model || "-"}</td>
-                <td style={td}>{item.imei || "-"}</td>
-                <td style={td}>{item.fault || "-"}</td>
-                <td style={td}>₹ {item.service || 0}</td>
-                <td style={td}>₹ {item.spare || 0}</td>
-              </tr>
-            ))}
+        
+{items.map((item, i) => (
+  <tr key={i}>
+    <td style={td}>{item.make || "-"}</td>
+    <td style={td}>{item.model || "-"}</td>
+    <td style={td}>{item.imei || "-"}</td>
+    <td style={td}>{item.fault || "-"}</td>
+    <td style={td}>
+      ₹ {(Number(item.service || 0) + Number(item.spare || 0)).toFixed(2)}
+    </td>
+  </tr>
+))}
           </tbody>
         </table>
 
@@ -246,7 +248,41 @@ const InvoiceBill = () => {
           <div>Sub Total : ₹{subTotal}</div>
           <b>Grand Total : ₹{grandTotal.toFixed(2)}</b>
         </div>
+{/* REMARKS */}
+{job.service?.remarks && (
+  <div style={{ marginTop: "20px" }}>
+    <div style={{
+      display: "flex",
+      alignItems: "center",
+      gap: "8px",
+      marginBottom: "8px"
+    }}>
+      <div style={{
+        width: "4px",
+        height: "18px",
+        background: "#2c2c2c",
+        borderRadius: "2px"
+      }} />
+      <span style={{ fontWeight: "700", fontSize: "13px", letterSpacing: "1px" }}>
+        REMARKS
+      </span>
+    </div>
 
+    <div style={{
+      border: "1px solid #d0d0d0",
+      borderLeft: "4px solid #2c2c2c",
+      borderRadius: "4px",
+      padding: "12px 16px",
+      background: "#f9f9f9",
+      fontSize: "13px",
+      lineHeight: "1.7",
+      whiteSpace: "pre-wrap",
+      color: "#222"
+    }}>
+      {job.service.remarks}
+    </div>
+  </div>
+)}
         {/* TERMS */}
 
         <div style={{ marginTop: "25px" }}>

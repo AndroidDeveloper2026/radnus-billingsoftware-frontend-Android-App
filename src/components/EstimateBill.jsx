@@ -289,7 +289,7 @@ body{background:#fff}
               <div className="sub">
                 242, Sinnaya Plaza, MG Road,<br />
                 Puducherry - 605001<br />
-                Phone: 81222 73355<br />
+                Phone: 81222 73355 / 99409 73030<br />
                 Mon–Sat (10AM–7PM)<br />
                 Website: www.radnus.in
               </div>
@@ -400,7 +400,25 @@ body{background:#fff}
             </div>
 
           </div>
-
+{/* REMARKS */}
+{data.service?.remarks && (
+  <div className="section">
+    <div className="section-title">Remarks</div>
+    <div style={{
+      border: "1px solid #d0d0d0",
+      borderLeft: "4px solid #2c2c2c",
+      borderRadius: "4px",
+      padding: "12px 16px",
+      background: "#f9f9f9",
+      fontSize: "13px",
+      lineHeight: "1.7",
+      whiteSpace: "pre-wrap",
+      color: "#222"
+    }}>
+      {data.service.remarks}
+    </div>
+  </div>
+)}
 
           {/* SIGN */}
 
