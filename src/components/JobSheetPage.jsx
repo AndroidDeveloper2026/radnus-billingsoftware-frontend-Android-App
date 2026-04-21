@@ -14,6 +14,7 @@ const JobSheetPage = ({ editData = null, isEdit = false }) => {
   const navigate = useNavigate();
   const [jobSheetNo, setJobSheetNo] = useState("");
   const [saving, setSaving] = useState(false);
+  const pendingNextNo = React.useRef(null);
   const API = import.meta.env.VITE_API_URL;
 
   /* ================= TIME ================= */
@@ -31,12 +32,25 @@ const JobSheetPage = ({ editData = null, isEdit = false }) => {
   }, []);
   /* ================= JOB SHEET NO ================= */
 
+  // useEffect(() => {
+  //   if (isEdit && editData) {
+  //     // 🔒 EDIT MODE → DB value ONLY
+  //     setJobSheetNo(editData.jobSheetNo);
+  //   } else {
+  //     // 🆕 NEW MODE → localStorage
+  //     axios.get(`${API}/api/jobsheets/next-number`)
+  //       .then(res => setJobSheetNo(res.data.next))
+  //       .catch(err => console.error(err));
+  //   }
+  // }, [isEdit, editData]);
+
   useEffect(() => {
     if (isEdit && editData) {
-      // 🔒 EDIT MODE → DB value ONLY
       setJobSheetNo(editData.jobSheetNo);
-    } else {
-      // 🆕 NEW MODE → localStorage
+    } else if (pendingNextNo.current) {
+      setJobSheetNo(pendingNextNo.current);
+      pendingNextNo.current = null;
+    } else if (!jobSheetNo) {
       axios.get(`${API}/api/jobsheets/next-number`)
         .then(res => setJobSheetNo(res.data.next))
         .catch(err => console.error(err));
@@ -84,7 +98,7 @@ const JobSheetPage = ({ editData = null, isEdit = false }) => {
   }, [make]);
 
   const [imei, setImei] = useState("");
-  const [warranty, setWarranty] = useState("");
+  const [warranty, setWarranty] = useState("No Warranty");
   const [pattern, setPattern] = useState("");
   const [mobileStatus, setMobileStatus] = useState("");
   const [idProofType, setIdProofType] = useState("");
@@ -237,7 +251,7 @@ const JobSheetPage = ({ editData = null, isEdit = false }) => {
           contact,
           altContact,
           address,
-          email, // ✅ merged
+          email, 
         })
       );
 
@@ -319,14 +333,27 @@ const JobSheetPage = ({ editData = null, isEdit = false }) => {
       );
 
       /* ================= JOB NUMBER INCREMENT ================= */
-      // get next job number from DB
-      axios.get(`${API}/api/jobsheets/next-number`)
-        .then(res => setJobSheetNo(res.data.next))
-        .catch(err => console.error(err));
+      // // get next job number from DB
+      // axios.get(`${API}/api/jobsheets/next-number`)
+      //   .then(res => setJobSheetNo(res.data.next))
+      //   .catch(err => console.error(err));
 
-      alert("Job Sheet Saved Successfully ✅");
+      // alert("Job Sheet Saved Successfully ✅");
 
-      handleNew();
+      // handleNew();
+
+     alert("Job Sheet Saved Successfully ✅");
+
+// 🔥 IMPORTANT FIX (delay add)
+setTimeout(() => {
+  axios.get(`${API}/api/jobsheets/next-number`)
+    .then(res => {
+      handleNew(res.data.next);
+    })
+    .catch(err => console.error(err));
+}, 300); // 300ms delay
+
+    
 
     } catch (err) {
       console.error(err);
@@ -346,7 +373,7 @@ const JobSheetPage = ({ editData = null, isEdit = false }) => {
 
   /* ================= NEW ================= */
 
-  const handleNew = () => {
+ const handleNew = (nextNo = null) => {
     // ✅ clear all fields
     setCustomerName("");
     setContact("");
@@ -383,15 +410,32 @@ const JobSheetPage = ({ editData = null, isEdit = false }) => {
     setRepairDate(today);
     setDeliveryDate(today);
 
-    // ✅ IMPORTANT: exit edit mode
-    navigate("/jobsheet"); // go to fresh route
+  //   // ✅ IMPORTANT: exit edit mode
+  //   // navigate("/jobsheet"); // go to fresh route
 
-    // ✅ NEW JOB NUMBER
+  //   // ✅ NEW JOB NUMBER
 
-    axios.get(`${API}/api/jobsheets/next-number`)
-      .then(res => setJobSheetNo(res.data.next))
-      .catch(err => console.error(err));
-  };
+  // //   axios.get(`${API}/api/jobsheets/next-number`)
+  // //     .then(res => setJobSheetNo(res.data.next))
+  // //     .catch(err => console.error(err));
+  // // };
+
+  // if (nextNo) {
+  //     setJobSheetNo(nextNo);
+  //   } else {
+  //     axios.get(`${API}/api/jobsheets/next-number`)
+  //       .then(res => setJobSheetNo(res.data.next))
+  //       .catch(err => console.error(err));
+  //   }
+  // };
+
+ if (nextNo) {
+  setJobSheetNo(nextNo); // 🔥 DIRECT SET
+} else {
+  axios.get(`${API}/api/jobsheets/next-number`)
+    .then(res => setJobSheetNo(res.data.next));
+}
+ };
 
   /* ================= EDIT DATA ================= */
 
@@ -759,6 +803,7 @@ const JobSheetPage = ({ editData = null, isEdit = false }) => {
                   onChange={(e) => setWarranty(e.target.value)}
                 >
                   <option value="">Warranty</option>
+                  <option value="No Warranty">No Warranty</option>
                   <option value="3 months">3 Months</option>
                   <option value="6 months">6 Months</option>
                   <option value="1 year">1 Year</option>
