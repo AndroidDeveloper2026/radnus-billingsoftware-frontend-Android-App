@@ -202,7 +202,6 @@ const Home = () => {
       Job Sheet
     </div>
 
-    {role === "admin" && (
       <NavItem
         title="Admin Operation"
         items={["Engineer Addition", "User List", "User Addition", "User Report"]}
@@ -213,7 +212,7 @@ const Home = () => {
           if (item === "User Report") navigate("/user-report");
         }}
       />
-    )}
+  
 
     <NavItem
       title="Data Operation"
@@ -226,14 +225,14 @@ const Home = () => {
       }}
     />
 
-   {role === "admin" && (
+  
   <div
     onClick={() => navigate("/report")}
     className="px-4 py-2 cursor-pointer text-slate-300 hover:text-indigo-400 text-sm"
   >
     Report
   </div>
-)}
+
 
     <div
       onClick={handleLogout}
@@ -314,17 +313,9 @@ const Home = () => {
       Drawer
     </div>
 
-   {role === "admin" && (
-  <div
-    onClick={() => {
-      navigate("/report");
-      setMobileMenu(false);
-    }}
-    className="px-4 py-3 text-slate-300 border-b border-white/5"
-  >
-    Report
-  </div>
-)}
+  <div onClick={() => navigate("/report")}>
+  Report
+</div>
 
     {/* Logout */}
     <div
