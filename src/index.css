@@ -14,7 +14,10 @@
 :root {
   color-scheme: dark;
 }
-
+input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: invert(1);
+  cursor: pointer;
+}
 body {
   background-color: #020617;
   color: #f8fafc;

@@ -3,7 +3,7 @@ import axios from "axios";
 import makeModelData from "../data/makeModelData";
 import JobSheetSearchModal from "./JobSheetSearchModal";
 import SparePopup from "./SparePopup";
-
+import Select from "react-select";
 import { useNavigate } from "react-router-dom";
 const isValidEmail = (email) =>
   /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
@@ -83,19 +83,21 @@ const JobSheetPage = ({ editData = null, isEdit = false }) => {
   const [model, setModel] = useState("");
   const [customModel, setCustomModel] = useState("");
 
-  useEffect(() => {
-    if (!make || make === "__custom") {
-      setModelList([]);
-      return;
-    }
+ useEffect(() => {
+  const selectedMake = make === "__custom" ? customMake : make;
 
-    axios.get(`${API}/api/models/${make}`)
-      .then(res => setModelList(res.data))
-      .catch(err => {
-        console.error("Model fetch error:", err);
-        setModelList([]);
-      });
-  }, [make]);
+  if (!selectedMake) {
+    setModelList([]);
+    return;
+  }
+
+  axios.get(`${API}/api/models/${selectedMake}`)
+    .then(res => setModelList(res.data))
+    .catch(err => {
+      console.error("Model fetch error:", err);
+      setModelList([]);
+    });
+}, [make, customMake]);
 
   const [imei, setImei] = useState("");
   const [warranty, setWarranty] = useState("No Warranty");
@@ -237,7 +239,28 @@ const JobSheetPage = ({ editData = null, isEdit = false }) => {
     try {
 
       const currentJobSheetNo = jobSheetNo;
+// 🔥 AUTO ADD MAKE (USER INPUT)
+if (make === "__custom" && customMake) {
+  try {
+    await axios.post(`${API}/api/makes`, {
+      name: customMake,
+    });
+  } catch (err) {
+    console.log("Make already exists or error");
+  }
+}
 
+// 🔥 AUTO ADD MODEL (USER INPUT)
+if (model === "__custom" && customModel && customMake) {
+  try {
+    await axios.post(`${API}/api/models`, {
+      name: customModel,
+      make: customMake,
+    });
+  } catch (err) {
+    console.log("Model already exists or error");
+  }
+}
       const formData = new FormData();
 
       /* ================= BASIC ================= */
@@ -343,8 +366,13 @@ const JobSheetPage = ({ editData = null, isEdit = false }) => {
       // handleNew();
 
      alert("Job Sheet Saved Successfully ✅");
+// 🔄 REFRESH MODEL LIST
+const selectedMake = make === "__custom" ? customMake : make;
 
-// 🔥 IMPORTANT FIX (delay add)
+if (selectedMake) {
+  axios.get(`${API}/api/models/${selectedMake}`)
+    .then(res => setModelList(res.data));
+}
 setTimeout(() => {
   axios.get(`${API}/api/jobsheets/next-number`)
     .then(res => {
@@ -708,67 +736,81 @@ setTimeout(() => {
 
               {/* Row 1 */}
               {/* MAKE */}
-              <div className="col-md-4">
-                <select
-                  className="form-select form-select-sm"
-                  value={make}
-                  onChange={(e) => {
-                    setMake(e.target.value);
-                    setCustomMake("");
-                    setModel("");
-                    setCustomModel("");
-                  }}
-                >
-                  <option value="">Select Make</option>
+             {/* MAKE */}
+<div className="col-md-4">
+  <Select
+   options={[
+  ...makeList.map(mk => ({
+    label: typeof mk === "string" ? mk : mk.name,
+    value: typeof mk === "string" ? mk : mk.name
+  })),
+  { label: "Other (Add New)", value: "__custom" }
+]}
+   value={
+  makeList
+    .map(mk => ({
+      label: typeof mk === "string" ? mk : mk.name,
+      value: typeof mk === "string" ? mk : mk.name
+    }))
+    .find(opt => opt.value === make) || null
+}
+    onChange={(selected) => {
+      setMake(selected?.value || "");
+      setCustomMake("");
+      setModel("");
+      setCustomModel("");
+    }}
+    placeholder="Search Make..."
+    isClearable
+  />
 
-                  {makeList.map((mk, i) => (
-                    <option key={i} value={mk.name || mk}>
-                      {mk.name || mk}
-                    </option>
-                  ))}
+  {/* CUSTOM MAKE INPUT */}
+  {make === "__custom" && (
+    <input
+      className="form-control form-control-sm mt-2"
+      placeholder="Enter Make"
+      value={customMake}
+      onChange={(e) => setCustomMake(e.target.value)}
+    />
+  )}
+</div>
 
-                  <option value="__custom">Other (Add New)</option>
-                </select>
+{/* MODEL */}
+<div className="col-md-4">
+  <Select
+  options={[
+  ...modelList.map(m => ({
+    label: typeof m === "string" ? m : m.name,
+    value: typeof m === "string" ? m : m.name
+  })),
+  { label: "Other (Add New)", value: "__custom" }
+]}
+   value={
+  modelList
+    .map(m => ({
+      label: typeof m === "string" ? m : m.name,
+      value: typeof m === "string" ? m : m.name
+    }))
+    .find(opt => opt.value === model) || null
+}
+    onChange={(selected) => {
+      setModel(selected?.value || "");
+      setCustomModel("");
+    }}
+    placeholder="Search Model..."
+    isClearable
+  />
 
-
-                {make === "__custom" && (
-                  <input
-                    className="form-control form-control-sm mt-1"
-                    placeholder="Enter Make"
-                    value={customMake}
-                    onChange={(e) => setCustomMake(e.target.value)}
-                  />
-                )}
-              </div>
-
-              {/* MODEL */}
-              <div className="col-md-4">
-                <select
-                  className="form-select form-select-sm"
-                  value={model}
-                  onChange={(e) => setModel(e.target.value)}
-                >
-                  <option value="">Select Model</option>
-
-                  {modelList.map((m, i) => (
-                    <option key={i} value={m.name || m}>
-                      {m.name || m}
-                    </option>
-                  ))}
-
-                  <option value="__custom">Other (Add New)</option>
-                </select>
-
-
-                {model === "__custom" && (
-                  <input
-                    className="form-control form-control-sm mt-1"
-                    placeholder="Enter Model"
-                    value={customModel}
-                    onChange={(e) => setCustomModel(e.target.value)}
-                  />
-                )}
-              </div>
+  {/* CUSTOM MODEL INPUT */}
+  {model === "__custom" && (
+    <input
+      className="form-control form-control-sm mt-2"
+      placeholder="Enter Model"
+      value={customModel}
+      onChange={(e) => setCustomModel(e.target.value)}
+    />
+  )}
+</div>
 
 
               <div className="col-md-4">
