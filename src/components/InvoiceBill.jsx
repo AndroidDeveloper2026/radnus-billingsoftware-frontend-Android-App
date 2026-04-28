@@ -68,10 +68,13 @@ const InvoiceBill = () => {
         id="invoice"
         style={{
           width: "210mm",
-          minHeight: "297mm",
+        height: "297mm",
+padding: "18px",
           margin: "auto",
           border: "2px solid #000",
-          padding: "25px",
+    fontSize: "12px",
+lineHeight: "1.4",
+overflow: "hidden",
           fontFamily: "system-ui, -apple-system, Segoe UI, Roboto",
           position: "relative",
           background: "#fff",
@@ -99,7 +102,7 @@ const InvoiceBill = () => {
             style={{
               display: "flex",
               justifyContent: "space-between",
-              fontSize: "13px",
+              fontSize: "11px",
             }}
           >
             <div>
@@ -142,7 +145,7 @@ const InvoiceBill = () => {
           <div style={{ textAlign: "center", marginTop: "8px" }}>
             <img src={Logo} style={{ height: "60px" }} />
 
-            <h2 style={{ margin: "5px 0", letterSpacing: "2px" }}>
+          <h2 style={{ margin: "4px 0", letterSpacing: "1px", fontSize: "16px" }}>
               RADNUS COMMUNICATION
             </h2>
 
@@ -156,9 +159,9 @@ const InvoiceBill = () => {
 
         <div
           style={{
-            display: "flex",
-            justifyContent: "space-between",
-            marginTop: "18px",
+         marginTop: "12px",
+fontSize: "12px",
+lineHeight: "1.6"
           }}
         >
           {/* CUSTOMER */}
@@ -244,7 +247,8 @@ const InvoiceBill = () => {
 
         {/* TOTAL */}
 
-        <div style={{ textAlign: "right", marginTop: "10px", fontSize: "15px" }}>
+        <div style={{ textAlign: "right", marginTop: "6px",
+fontSize: "12px"}}>
           <div>Sub Total : ₹{subTotal}</div>
           <b>Grand Total : ₹{grandTotal.toFixed(2)}</b>
         </div>
@@ -272,12 +276,16 @@ const InvoiceBill = () => {
       border: "1px solid #d0d0d0",
       borderLeft: "4px solid #2c2c2c",
       borderRadius: "4px",
-      padding: "12px 16px",
+      
       background: "#f9f9f9",
-      fontSize: "13px",
-      lineHeight: "1.7",
+     
+   
       whiteSpace: "pre-wrap",
-      color: "#222"
+      color: "#222",
+      marginTop: "10px",
+fontSize: "11px",
+padding: "8px 10px",
+lineHeight: "1.5",
     }}>
       {job.service.remarks}
     </div>
@@ -294,10 +302,13 @@ const InvoiceBill = () => {
             style={{
               border: "1px solid #ccc",
               borderRadius: "4px",
-              padding: "10px",
+          
               background: "#fafafa",
-              fontSize: "13px",
-              lineHeight: "1.6",
+              
+              marginTop: "12px",
+fontSize: "11px",
+padding: "8px",
+lineHeight: "1.4",
             }}
           >
             <ol style={{ margin: 0, paddingLeft: "16px" }}>
@@ -335,8 +346,8 @@ const InvoiceBill = () => {
               borderRadius: "4px",
               padding: "10px",
               background: "#fafafa",
-              fontSize: "13px",
-              lineHeight: "1.7",
+             fontSize: "11px",
+lineHeight: "1.5",
             }}
           >
             <ol style={{ margin: 0, paddingLeft: "16px" }}>
@@ -365,7 +376,7 @@ const InvoiceBill = () => {
 
         {/* SIGN */}
 
-        <div style={{ textAlign: "right", marginTop: "40px" }}>
+        <div style={{ textAlign: "right", marginTop: "20px"}}>
           Authorized Signature
         </div>
       </div>

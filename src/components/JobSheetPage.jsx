@@ -16,7 +16,7 @@ const JobSheetPage = ({ editData = null, isEdit = false }) => {
   const [saving, setSaving] = useState(false);
   const pendingNextNo = React.useRef(null);
   const API = import.meta.env.VITE_API_URL;
-
+const [customFaults, setCustomFaults] = useState([]);
   /* ================= TIME ================= */
   const [now, setNow] = useState(new Date());
   useEffect(() => {
@@ -261,6 +261,23 @@ if (model === "__custom" && customModel && customMake) {
     console.log("Model already exists or error");
   }
 }
+// 🔥 AUTO ADD ONLY NEW FAULT (CASE-INSENSITIVE)
+for (let f of visualIssues) {
+  if (
+    f &&
+    !faultList.some(
+      fl => fl.name.toLowerCase() === f.toLowerCase()
+    )
+  ) {
+    try {
+      await axios.post(`${API}/api/faults`, {
+        name: f,
+      });
+    } catch (err) {
+      console.log("Fault exists or error");
+    }
+  }
+}
       const formData = new FormData();
 
       /* ================= BASIC ================= */
@@ -373,6 +390,8 @@ if (selectedMake) {
   axios.get(`${API}/api/models/${selectedMake}`)
     .then(res => setModelList(res.data));
 }
+axios.get(`${API}/api/faults`)
+  .then(res => setFaultList(res.data));
 setTimeout(() => {
   axios.get(`${API}/api/jobsheets/next-number`)
     .then(res => {
@@ -437,25 +456,6 @@ setTimeout(() => {
     const today = new Date().toISOString().split("T")[0];
     setRepairDate(today);
     setDeliveryDate(today);
-
-  //   // ✅ IMPORTANT: exit edit mode
-  //   // navigate("/jobsheet"); // go to fresh route
-
-  //   // ✅ NEW JOB NUMBER
-
-  // //   axios.get(`${API}/api/jobsheets/next-number`)
-  // //     .then(res => setJobSheetNo(res.data.next))
-  // //     .catch(err => console.error(err));
-  // // };
-
-  // if (nextNo) {
-  //     setJobSheetNo(nextNo);
-  //   } else {
-  //     axios.get(`${API}/api/jobsheets/next-number`)
-  //       .then(res => setJobSheetNo(res.data.next))
-  //       .catch(err => console.error(err));
-  //   }
-  // };
 
  if (nextNo) {
   setJobSheetNo(nextNo); // 🔥 DIRECT SET
@@ -535,6 +535,25 @@ setTimeout(() => {
   useEffect(() => {
     setLocalEditData(editData);
   }, [editData]);
+
+
+  // ✅ ADD THIS HERE (BEFORE return)
+
+const makeOptions = [
+  ...makeList.map(mk => ({
+    label: typeof mk === "string" ? mk : mk.name,
+    value: typeof mk === "string" ? mk : mk.name
+  })),
+  { label: "Other (Add New)", value: "__custom" }
+];
+
+const modelOptions = [
+  ...modelList.map(m => ({
+    label: typeof m === "string" ? m : m.name,
+    value: typeof m === "string" ? m : m.name
+  })),
+  { label: "Other (Add New)", value: "__custom" }
+];
 
   return (
     <div className="container-fluid bg-light min-vh-100 p-3">
@@ -739,21 +758,8 @@ setTimeout(() => {
              {/* MAKE */}
 <div className="col-md-4">
   <Select
-   options={[
-  ...makeList.map(mk => ({
-    label: typeof mk === "string" ? mk : mk.name,
-    value: typeof mk === "string" ? mk : mk.name
-  })),
-  { label: "Other (Add New)", value: "__custom" }
-]}
-   value={
-  makeList
-    .map(mk => ({
-      label: typeof mk === "string" ? mk : mk.name,
-      value: typeof mk === "string" ? mk : mk.name
-    }))
-    .find(opt => opt.value === make) || null
-}
+    options={makeOptions}
+    value={makeOptions.find(opt => opt.value === make) || null}
     onChange={(selected) => {
       setMake(selected?.value || "");
       setCustomMake("");
@@ -764,7 +770,6 @@ setTimeout(() => {
     isClearable
   />
 
-  {/* CUSTOM MAKE INPUT */}
   {make === "__custom" && (
     <input
       className="form-control form-control-sm mt-2"
@@ -778,21 +783,8 @@ setTimeout(() => {
 {/* MODEL */}
 <div className="col-md-4">
   <Select
-  options={[
-  ...modelList.map(m => ({
-    label: typeof m === "string" ? m : m.name,
-    value: typeof m === "string" ? m : m.name
-  })),
-  { label: "Other (Add New)", value: "__custom" }
-]}
-   value={
-  modelList
-    .map(m => ({
-      label: typeof m === "string" ? m : m.name,
-      value: typeof m === "string" ? m : m.name
-    }))
-    .find(opt => opt.value === model) || null
-}
+    options={modelOptions}
+    value={modelOptions.find(opt => opt.value === model) || null}
     onChange={(selected) => {
       setModel(selected?.value || "");
       setCustomModel("");
@@ -801,7 +793,6 @@ setTimeout(() => {
     isClearable
   />
 
-  {/* CUSTOM MODEL INPUT */}
   {model === "__custom" && (
     <input
       className="form-control form-control-sm mt-2"
@@ -933,11 +924,11 @@ setTimeout(() => {
                     >
                       <option value="">Select Engineer</option>
 
-                      {engineerList.map((e, i) => (
-                        <option key={i} value={e.name || e}>
-                          {e.name || e}
-                        </option>
-                      ))}
+                     {engineerList.map((eng, i) => (
+  <option key={i} value={eng.name || eng}>
+    {eng.name || eng}
+  </option>
+))}
                     </select>
                   </div>
 
@@ -1064,49 +1055,91 @@ setTimeout(() => {
             </div>
           </div>
         </div>
+<div className="col-md-3">
+  <div className="card shadow-sm h-100">
+    <div className="card-header fw-bold">Visual Inspection</div>
+    <div className="card-body">
 
-        {/* RIGHT COLUMN */}
-        <div className="col-md-3">
-          <div className="card shadow-sm h-100">
-            <div className="card-header fw-bold">Visual Inspection</div>
-            <div className="card-body">
-              {visualIssues.map((issue, i) => (
-                <div className="d-flex gap-2 mb-2" key={i}>
-                  <select
-                    className="form-select form-select-sm"
-                    value={issue}
-                    onChange={(e) => updateIssue(i, e.target.value)}
-                  >
-                    <option value="">Select Issue</option>
+      {visualIssues.map((issue, i) => (
+        <div className="mb-2" key={i}>
 
-                    {faultList.map(f => (
-                      <option key={f._id} value={f.name}>
-                        {f.name} {f.price ? `- ₹${f.price}` : ""}
-                      </option>
-                    ))}
-                  </select>
+          {/* DROPDOWN */}
+          <select
+            className="form-select form-select-sm"
+            value={customFaults[i] !== undefined ? "__custom" : issue}
+            onChange={(e) => {
+              if (e.target.value === "__custom") {
+                // dropdown "__custom" select பண்ணும்போது
+                // customFaults-ல் empty string வை, visualIssues-ல் "" வை
+                setCustomFaults(prev => ({ ...prev, [i]: "" }));
+                updateIssue(i, "");
+              } else {
+                // normal fault select பண்ணும்போது
+                // customFaults-லிருந்து இந்த row-ஐ remove பண்ணு
+                setCustomFaults(prev => {
+                  const copy = { ...prev };
+                  delete copy[i];
+                  return copy;
+                });
+                updateIssue(i, e.target.value);
+              }
+            }}
+          >
+            <option value="">Select Issue</option>
+            {faultList.map(f => (
+              <option key={f._id} value={f.name}>
+                {f.name}
+              </option>
+            ))}
+            <option value="__custom">Other (Add New)</option>
+          </select>
 
-                  {visualIssues.length > 1 && (
-                    <button
-                      className="btn btn-danger btn-sm"
-                      onClick={() => removeIssue(i)}
-                    >
-                      ✕
-                    </button>
-                  )}
-                </div>
-              ))}
+          {/* CUSTOM INPUT — "__custom" select ஆனால் மட்டும் காட்டு */}
+          {customFaults[i] !== undefined && (
+            <input
+              className="form-control form-control-sm mt-2"
+              placeholder="Enter Fault"
+              value={customFaults[i]}
+              onChange={(e) => {
+                const val = e.target.value;
+                // customFaults update பண்ணு (input காட்டுவதற்கு)
+                setCustomFaults(prev => ({ ...prev, [i]: val }));
+                // visualIssues-ல் typed value store பண்ணு (save-க்கு)
+                updateIssue(i, val);
+              }}
+            />
+          )}
 
-              <button
-                className="btn btn-outline-primary btn-sm w-100"
-                onClick={addIssue}
-              >
-                + Add Issue
-              </button>
+          {/* REMOVE BUTTON */}
+          {visualIssues.length > 1 && (
+            <button
+              className="btn btn-outline-danger btn-sm mt-1 w-100"
+              onClick={() => {
+                removeIssue(i);
+                setCustomFaults(prev => {
+                  const copy = { ...prev };
+                  delete copy[i];
+                  return copy;
+                });
+              }}
+            >
+              ✕ Remove
+            </button>
+          )}
 
-            </div>
-          </div>
         </div>
+      ))}
+
+      <button
+        className="btn btn-outline-primary btn-sm w-100"
+        onClick={addIssue}
+      >
+        + Add Issue
+      </button>
+
+    </div>
+  </div>
+</div>
 
       </div>
 
