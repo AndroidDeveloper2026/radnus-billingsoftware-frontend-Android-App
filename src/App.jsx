@@ -1,9 +1,9 @@
 import React from "react";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import Firstpage from "./components/Firstpage";
 import JobSheetPage from "./components/JobSheetPage";
+import JobSheetEditWrapper from "./components/JobSheetEditWrapper";
 import Home from "./components/Home";
-import JobSheetEdit from "./components/JobSheetEdit";
 import EstimateBill from "./components/EstimateBill";
 import ReportPage from "./components/reports/MainReportPage";
 import RepairPendingReport from "./components/reports/RepairPendingReport";
@@ -18,19 +18,27 @@ import AllReportPage from "./components/reports/AllReportPage";
 import EngineerReportPage from "./components/reports/EngineerReportPage";
 import DealerReportPage from "./components/reports/DealerReportPage";
 import InvoiceBill from "./components/InvoiceBill";
-// import UserAddition from "./components/popups/UserAddition";
 import UserReportPage from "./components/reports/UserReportPage";
 import UserListPopup from "./components/popups/UserListPopup";
 import SpareReportPage from "./components/reports/SpareReportPage";
-import './App.css'
+import './App.css';
+
 function App() {
   return (
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<Firstpage />} />
         <Route path="/home" element={<Home />} />
-        <Route path="/jobsheet" element={<JobSheetPage />} />
-        <Route path="/jobsheet/:id" element={<JobSheetEdit />} />
+
+        {/* ✅ /jobsheet → /jobsheet/new redirect */}
+        <Route path="/jobsheet" element={<Navigate to="/jobsheet/new" replace />} />
+
+        {/* ✅ NEW — empty form, Save button */}
+        <Route path="/jobsheet/new" element={<JobSheetPage isEdit={false} editData={null} />} />
+
+        {/* ✅ EDIT — filled form, Update button */}
+        <Route path="/jobsheet/:id" element={<JobSheetEditWrapper />} />
+
         <Route path="/estimate-bill/:id" element={<EstimateBill />} />
         <Route path="/invoice/:id" element={<InvoiceBill />} />
         <Route path="/report" element={<ReportPage />} />
@@ -45,12 +53,12 @@ function App() {
         <Route path="/all-report" element={<AllReportPage />} />
         <Route path="/engineer-all-report" element={<EngineerReportPage />} />
         <Route path="/dealer-report" element={<DealerReportPage />} />
-        {/* <Route path="/user-add" element={<UserAddition />} /> */}
-         <Route path="/user-report" element={<UserReportPage />} />
-         <Route path="/user-list" element={<UserListPopup />} />
-         <Route path="/spare-report" element={<SpareReportPage />} />
+        <Route path="/user-report" element={<UserReportPage />} />
+        <Route path="/user-list" element={<UserListPopup />} />
+        <Route path="/spare-report" element={<SpareReportPage />} />
       </Routes>
     </BrowserRouter>
   );
 }
+
 export default App;

@@ -423,6 +423,7 @@ setTimeout(() => {
  const handleNew = (nextNo = null) => {
     // ✅ clear all fields
     setCustomerName("");
+    
     setContact("");
     setAltContact("");
     setAddress("");
@@ -1231,14 +1232,13 @@ const modelOptions = [
           >
             Home
           </button>
+<button
+  className="btn btn-outline-dark btn-sm"
+  onClick={() => navigate("/jobsheet/new")}
+>
+  New
+</button>
 
-          {/* NEW */}
-          <button
-            className="btn btn-outline-dark btn-sm"
-            onClick={handleNew}
-          >
-            New
-          </button>
 
         </div>
       </div>
