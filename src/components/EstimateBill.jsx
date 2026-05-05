@@ -286,13 +286,16 @@ body{background:#fff}
             <div>
               <div className="company">RADNUS COMMUNICATION</div>
 
-              <div className="sub">
-                242, Sinnaya Plaza, MG Road,<br />
-                Puducherry - 605001<br />
-                Phone: 81222 73355 / 99409 73030<br />
-                Mon–Sat (10AM–7PM)<br />
-                Website: www.radnus.in
-              </div>
+             <div className="sub">
+  242, Sinnaya Plaza, MG Road,<br />
+  Puducherry - 605001<br />
+  Phone:<br />
+  81222 73355<br />
+  99409 73030<br />
+  98944 36987<br />
+  Mon–Sat (10AM–7PM)<br />
+  Website: www.radnus.in
+</div>
             </div>
 
 
@@ -361,11 +364,19 @@ body{background:#fff}
 
               <div className="section-title">Device</div>
 
-              <div className="box">
+              {/* <div className="box">
                 Brand: {val(data.device?.make)}<br />
                 Model: {val(data.device?.model)}<br />
                 IMEI: {val(data.device?.imei)}
-              </div>
+              </div> */}
+              {/* Device section-ல் fault add பண்ணுங்கள் */}
+<div className="box">
+  Brand: {val(data.device?.make)}<br />
+  Model: {val(data.device?.model)}<br />
+  IMEI: {val(data.device?.imei)}<br />
+  {/* ✅ ADD THIS */}
+  Fault: {val(data.visualIssues?.join(", "))}
+</div>
 
             </div>
 

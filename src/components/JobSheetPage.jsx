@@ -540,22 +540,36 @@ setTimeout(() => {
 
   // ✅ ADD THIS HERE (BEFORE return)
 
+const makeNames = makeList.map(mk => typeof mk === "string" ? mk : mk.name);
+
+const extraMake =
+  make &&
+  make !== "__custom" &&
+  !makeNames.includes(make)
+    ? [{ label: make, value: make }]
+    : [];
+
 const makeOptions = [
-  ...makeList.map(mk => ({
-    label: typeof mk === "string" ? mk : mk.name,
-    value: typeof mk === "string" ? mk : mk.name
-  })),
+  ...makeNames.map(name => ({ label: name, value: name })),
+  ...extraMake,
   { label: "Other (Add New)", value: "__custom" }
 ];
+const modelNames = modelList.map(m => typeof m === "string" ? m : m.name);
+
+// If current model value isn't in the list (e.g. custom model loaded in edit mode),
+// add it so the Select shows it correctly
+const extraModel =
+  model &&
+  model !== "__custom" &&
+  !modelNames.includes(model)
+    ? [{ label: model, value: model }]
+    : [];
 
 const modelOptions = [
-  ...modelList.map(m => ({
-    label: typeof m === "string" ? m : m.name,
-    value: typeof m === "string" ? m : m.name
-  })),
+  ...modelNames.map(name => ({ label: name, value: name })),
+  ...extraModel,
   { label: "Other (Add New)", value: "__custom" }
 ];
-
   return (
     <div className="container-fluid bg-light min-vh-100 p-3">
 
@@ -1067,7 +1081,7 @@ const modelOptions = [
           {/* DROPDOWN */}
           <select
             className="form-select form-select-sm"
-            value={customFaults[i] !== undefined ? "__custom" : issue}
+           value={customFaults[i] !== undefined ? "__custom" : (issue || "")}
             onChange={(e) => {
               if (e.target.value === "__custom") {
                 // dropdown "__custom" select பண்ணும்போது

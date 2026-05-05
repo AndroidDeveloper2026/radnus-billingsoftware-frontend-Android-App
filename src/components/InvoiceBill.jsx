@@ -113,13 +113,17 @@ overflow: "hidden",
 
             <table style={{ fontSize: "13px" }}>
               <tbody>
-                <tr>
-                  <td style={{ fontWeight: "bold", paddingRight: "6px" }}>
-                    PHONE NO
-                  </td>
-                  <td>:</td>
-                  <td style={{ paddingLeft: "6px" }}>81222 73355 / 99409 73030</td>
-                </tr>
+               <tr>
+  <td style={{ fontWeight: "bold", paddingRight: "6px", verticalAlign: "top" }}>
+    PHONE NO
+  </td>
+  <td style={{ verticalAlign: "top" }}>:</td>
+  <td style={{ paddingLeft: "6px", lineHeight: "1.6" }}>
+    81222 73355 <br />
+    99409 73030 <br />
+    98944 36987
+  </td>
+</tr>
 
                 <tr>
                   <td style={{ fontWeight: "bold", paddingRight: "6px" }}>
