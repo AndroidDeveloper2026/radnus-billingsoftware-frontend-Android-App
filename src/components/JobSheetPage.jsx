@@ -30,19 +30,6 @@ const [customFaults, setCustomFaults] = useState([]);
       .then((res) => setMakeList(res.data))
       .catch((err) => console.error("Make fetch error:", err));
   }, []);
-  /* ================= JOB SHEET NO ================= */
-
-  // useEffect(() => {
-  //   if (isEdit && editData) {
-  //     // 🔒 EDIT MODE → DB value ONLY
-  //     setJobSheetNo(editData.jobSheetNo);
-  //   } else {
-  //     // 🆕 NEW MODE → localStorage
-  //     axios.get(`${API}/api/jobsheets/next-number`)
-  //       .then(res => setJobSheetNo(res.data.next))
-  //       .catch(err => console.error(err));
-  //   }
-  // }, [isEdit, editData]);
 
   useEffect(() => {
     if (isEdit && editData) {
@@ -55,7 +42,7 @@ const [customFaults, setCustomFaults] = useState([]);
         .then(res => setJobSheetNo(res.data.next))
         .catch(err => console.error(err));
     }
-  }, [isEdit, editData]);
+ }, [isEdit, editData]);
 
 
   /* ================= SEARCH STATES ================= */
@@ -169,46 +156,67 @@ const [customFaults, setCustomFaults] = useState([]);
     setVisualIssues(visualIssues.filter((_, idx) => idx !== i));
 
   /* ================= UPDATE ================= */
-  const handleUpdate = async () => {
+ const handleUpdate = async () => {
     if (email && !isValidEmail(email)) {
       alert("Please enter valid Email ID ❌");
       return;
     }
 
     try {
-      const payload = {
-        jobSheetNo,
-        customer: { name: customerName, contact, altContact, address, email },
-        device: {
-          make,
-          model,
+      const formData = new FormData();
+
+      formData.append("jobSheetNo", jobSheetNo);
+
+      formData.append(
+        "customer",
+        JSON.stringify({ name: customerName, contact, altContact, address, email })
+      );
+
+      formData.append(
+        "device",
+        JSON.stringify({
+          make: make === "__custom" ? customMake : make,
+          model: model === "__custom" ? customModel : model,
           imei,
           warranty,
           pattern,
-          idProofType,
-          idProofImage,
-          mobileStatus
-        },
-        physicalCondition,
-        accessories,
-        visualIssues: visualIssues.filter(Boolean),
-        service: {
+          mobileStatus,
+        })
+      );
+
+      formData.append("physicalCondition", JSON.stringify(physicalCondition));
+      formData.append("accessories", JSON.stringify(accessories));
+      formData.append("visualIssues", JSON.stringify(visualIssues.filter(Boolean)));
+
+      formData.append(
+        "service",
+        JSON.stringify({
           engineer,
           dealer,
           drawer,
-          serviceCharge: Number(serviceCharge),
-          spareCharge: Number(spareCharge),
+          serviceCharge: Number(serviceCharge || 0),
+          spareCharge: Number(spareCharge || 0),
           estimate,
           paymentMode,
           repairDate,
           deliveryDate,
-          remarks
-        }
-      };
+          remarks,
+        })
+      );
+
+      // ✅ BUG FIX — spareItems update ல் missing ஆச்சு
+      formData.append("spareItems", JSON.stringify(spareItems));
+
+      formData.append("idProofType", idProofType);
+
+      if (idProofImage && typeof idProofImage !== "string") {
+        formData.append("idProofImage", idProofImage);
+      }
 
       await axios.put(
         `${API}/api/jobsheets/${editData._id}`,
-        payload
+        formData,
+        { headers: { "Content-Type": "multipart/form-data" } }
       );
 
       alert("Job Sheet Updated ✅");
@@ -217,7 +225,6 @@ const [customFaults, setCustomFaults] = useState([]);
       alert("Update failed ❌");
     }
   };
-
 
   /* ================= SAVE ================= */
 
@@ -444,12 +451,14 @@ setTimeout(() => {
     setPhysicalCondition([]);
     setAccessories([]);
     setVisualIssues([""]);
+    setCustomFaults({}); 
 
     setEngineer("");
     setDealer("");
     setDrawer("");
     setServiceCharge("");
     setSpareCharge("");
+      setSpareItems([]); 
     setEstimate("");
     setPaymentMode("");
     setRemarks("");
@@ -470,7 +479,7 @@ setTimeout(() => {
 
   useEffect(() => {
     if (!isEdit || !editData) return;
-
+setCustomFaults({}); 
     // CUSTOMER
     setCustomerName(editData.customer?.name || "");
     setContact(editData.customer?.contact || "");
@@ -492,7 +501,16 @@ setTimeout(() => {
     // CHECKBOX ARRAYS
     setPhysicalCondition(editData.physicalCondition || []);
     setAccessories(editData.accessories || []);
-    setVisualIssues(editData.visualIssues?.length ? editData.visualIssues : [""]);
+  const savedIssues = editData.visualIssues?.length ? editData.visualIssues : [""];
+setVisualIssues(savedIssues);
+
+const rebuilt = {};
+savedIssues.forEach((issue, i) => {
+  if (issue && !faultList.some(f => f.name.toLowerCase() === issue.toLowerCase())) {
+    rebuilt[i] = issue;
+  }
+});
+setCustomFaults(rebuilt);
 
     // SERVICE
     setEngineer(editData.service?.engineer || "");
@@ -507,7 +525,7 @@ setTimeout(() => {
     setDeliveryDate(editData.service?.deliveryDate?.slice(0, 10) || today);
     setRemarks(editData.service?.remarks || "");
 
-  }, [isEdit, editData]);
+  }, [isEdit, editData,faultList]);
 
 
   const handleSearch = async () => {
@@ -1089,8 +1107,7 @@ const modelOptions = [
                 setCustomFaults(prev => ({ ...prev, [i]: "" }));
                 updateIssue(i, "");
               } else {
-                // normal fault select பண்ணும்போது
-                // customFaults-லிருந்து இந்த row-ஐ remove பண்ணு
+               
                 setCustomFaults(prev => {
                   const copy = { ...prev };
                   delete copy[i];
@@ -1268,6 +1285,7 @@ const modelOptions = [
           onClose={() => setSparePopup(false)}
           setSpareCharge={setSpareCharge}
           setSpareItems={setSpareItems}
+             existingItems={spareItems} 
         />
       )}
 
