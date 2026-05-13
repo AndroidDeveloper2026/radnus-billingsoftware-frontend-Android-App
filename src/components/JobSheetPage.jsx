@@ -534,7 +534,8 @@ const handleSearch = async () => {
         `${API}/api/jobsheets/filter`,
         {
           params: {
-            q: searchText || undefined,
+            // ✅ number மட்டும் type பண்ணா q அனுப்பாதே — backend regex எல்லாத்தையும் match பண்ணிடும்
+            q: /^\d+$/.test(searchText.trim()) ? undefined : (searchText || undefined),
             status: searchStatus || undefined,
             fromDate: fromDate || undefined,
             toDate: toDate || undefined,
@@ -544,14 +545,11 @@ const handleSearch = async () => {
 
       let filtered = res.data;
 
-      // ✅ FIX — searchText number மட்டும் type பண்ணா (e.g. "096")
-      // JS-096 exact match மட்டும் காட்டு, random ones வேண்டாம்
+      // ✅ Number search — "10" → JS-010 exact match மட்டும்
       if (searchText && /^\d+$/.test(searchText.trim())) {
         const padded = searchText.trim().padStart(3, "0");
-        filtered = res.data.filter(js =>
-          js.jobSheetNo === `JS-${padded}` ||
-          js.jobSheetNo === searchText.trim()
-        );
+        const exact = `JS-${padded}`;
+        filtered = res.data.filter(js => js.jobSheetNo === exact);
       }
 
       setResults(filtered);
