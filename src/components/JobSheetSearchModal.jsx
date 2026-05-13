@@ -26,18 +26,13 @@ const JobSheetSearchModal = ({ data = [], onClose }) => {
         {/* HEADER */}
         <div className="d-flex justify-content-between align-items-center p-3 border-bottom">
           <h5 className="m-0">Job Sheets</h5>
-
-          <button
-            className="btn btn-sm btn-outline-danger"
-            onClick={onClose}
-          >
+          <button className="btn btn-sm btn-outline-danger" onClick={onClose}>
             ✕
           </button>
         </div>
 
         {/* BODY */}
         <div className="p-3">
-
           <table className="table table-sm table-hover align-middle">
             <thead className="table-light">
               <tr>
@@ -54,21 +49,20 @@ const JobSheetSearchModal = ({ data = [], onClose }) => {
                 data.map((js) => (
                   <tr key={js._id}>
                     <td>{js.jobSheetNo}</td>
-
                     <td>{js.customer?.name || "-"}</td>
-
                     <td>{js.device?.mobileStatus || "-"}</td>
-
                     <td>
                       {js.createdAt
                         ? new Date(js.createdAt).toLocaleDateString()
                         : "-"}
                     </td>
-
                     <td>
                       <button
                         className="btn btn-sm btn-primary"
-                        onClick={() => navigate(`/jobsheet/${js._id}`)}
+                        onClick={() => {
+                          onClose();                        // ✅ FIX 2 — popup close ஆகும்
+                          navigate(`/jobsheet/${js._id}`); // ✅ then navigate
+                        }}
                       >
                         Open
                       </button>
@@ -83,9 +77,7 @@ const JobSheetSearchModal = ({ data = [], onClose }) => {
                 </tr>
               )}
             </tbody>
-
           </table>
-
         </div>
       </div>
     </div>

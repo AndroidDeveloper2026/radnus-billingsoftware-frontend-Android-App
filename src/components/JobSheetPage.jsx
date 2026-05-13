@@ -528,7 +528,7 @@ setCustomFaults(rebuilt);
   }, [isEdit, editData,faultList]);
 
 
-  const handleSearch = async () => {
+const handleSearch = async () => {
     try {
       const res = await axios.get(
         `${API}/api/jobsheets/filter`,
@@ -542,7 +542,19 @@ setCustomFaults(rebuilt);
         }
       );
 
-      setResults(res.data);
+      let filtered = res.data;
+
+      // ✅ FIX — searchText number மட்டும் type பண்ணா (e.g. "096")
+      // JS-096 exact match மட்டும் காட்டு, random ones வேண்டாம்
+      if (searchText && /^\d+$/.test(searchText.trim())) {
+        const padded = searchText.trim().padStart(3, "0");
+        filtered = res.data.filter(js =>
+          js.jobSheetNo === `JS-${padded}` ||
+          js.jobSheetNo === searchText.trim()
+        );
+      }
+
+      setResults(filtered);
       setShowSearchModal(true);
 
     } catch (err) {
