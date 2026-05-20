@@ -528,38 +528,45 @@ setCustomFaults(rebuilt);
   }, [isEdit, editData,faultList]);
 
 
+const [searching, setSearching] = useState(false);
+
 const handleSearch = async () => {
-    try {
-      const res = await axios.get(
-        `${API}/api/jobsheets/filter`,
-        {
-          params: {
-            // ✅ number மட்டும் type பண்ணா q அனுப்பாதே — backend regex எல்லாத்தையும் match பண்ணிடும்
-            q: /^\d+$/.test(searchText.trim()) ? undefined : (searchText || undefined),
-            status: searchStatus || undefined,
-            fromDate: fromDate || undefined,
-            toDate: toDate || undefined,
-          },
-        }
-      );
+  setSearching(true);
+  try {
+    const trimmed = searchText.trim();
 
-      let filtered = res.data;
+    // Is it a pure job sheet number like "10" or "JS-010"?
+    const isJobSheetNo =
+      /^JS-\d+$/i.test(trimmed) ||
+      (/^\d{1,4}$/.test(trimmed) && trimmed.length <= 4);
 
-      // ✅ Number search — "10" → JS-010 exact match மட்டும்
-      if (searchText && /^\d+$/.test(searchText.trim())) {
-        const padded = searchText.trim().padStart(3, "0");
-        const exact = `JS-${padded}`;
-        filtered = res.data.filter(js => js.jobSheetNo === exact);
-      }
+    const res = await axios.get(`${API}/api/jobsheets/filter`, {
+      params: {
+        q: trimmed || undefined,
+        status: searchStatus || undefined,
+        fromDate: fromDate || undefined,
+        toDate: toDate || undefined,
+      },
+    });
 
-      setResults(filtered);
-      setShowSearchModal(true);
+    let filtered = res.data;
 
-    } catch (err) {
-      console.error(err);
-      alert("Search failed");
+    // Only do the exact JS-xxx match when it looks like a job number
+    if (trimmed && isJobSheetNo && /^\d+$/.test(trimmed)) {
+      const padded = trimmed.padStart(3, "0");
+      const exact = `JS-${padded}`;
+      filtered = res.data.filter((js) => js.jobSheetNo === exact);
     }
-  };
+
+    setResults(filtered);
+    setShowSearchModal(true);
+  } catch (err) {
+    console.error(err);
+    alert("Search failed");
+  } finally {
+    setSearching(false);
+  }
+};
   const [localEditData, setLocalEditData] = useState(editData);
   useEffect(() => {
     setLocalEditData(editData);
@@ -664,15 +671,36 @@ const modelOptions = [
 
           {/* ACTION */}
           <div className="col-md-3 d-flex gap-2">
-            <button
-              className="btn btn-primary btn-sm w-100"
-              onClick={handleSearch}
-            >
-              Search
-            </button>
-            <button className="btn btn-outline-success btn-sm w-100">
-              Download
-            </button>
+     <button
+  className="btn btn-primary d-flex align-items-center justify-content-center"
+  onClick={handleSearch}
+  disabled={searching}
+  style={{
+    fontSize: "16px",
+    padding: "14px 14px",
+    height: "35px",
+    minWidth: "100px",
+    width:"50%"
+  }}
+>
+  {searching ? (
+    <>
+      <span
+        className="spinner-border spinner-border-sm me-2"
+        style={{ width: "14px", height: "14px" }}
+        role="status"
+        aria-hidden="true"
+      />
+      Searching...
+    </>
+  ) : (
+    "Search"
+  )}
+</button>
+            
+
+
+            
           </div>
 
         </div>
