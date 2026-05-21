@@ -1,249 +1,445 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
+import * as XLSX from "xlsx";
 
 const AllReportPage = () => {
-  const [data, setData] = useState([]);
   const [filteredData, setFilteredData] = useState([]);
+  const [loading, setLoading] = useState(false);
 
-  const [search, setSearch] = useState("");
-  const [fromDate, setFromDate] = useState("");
-  const [toDate, setToDate] = useState("");
+  /* ── FILTER STATES ── */
+  const [search, setSearch]       = useState("");
+  const [status, setStatus]       = useState("");
+  const [engineer, setEngineer]   = useState("");
+  const [dealer, setDealer]       = useState("");
+  const [fromDate, setFromDate]   = useState("");
+  const [toDate, setToDate]       = useState("");
+
+  const [engineerList, setEngineerList] = useState([]);
+
   const API = import.meta.env.VITE_API_URL;
 
-  /* FETCH DATA */
+  /* ── FETCH ENGINEERS FOR DROPDOWN ── */
+  useEffect(() => {
+    axios.get(`${API}/api/engineers`)
+      .then(res => setEngineerList(res.data))
+      .catch(err => console.error(err));
+  }, []);
+
+  /* ── FETCH DATA (SERVER-SIDE FILTER) ── */
   const fetchData = async () => {
+    setLoading(true);
     try {
-      const res = await axios.get(
-        `${API}/api/jobsheets/filter`
-      );
-      setData(res.data);
+      const params = {};
+      if (search)   params.q        = search.trim();
+      if (status)   params.status   = status;
+      if (engineer) params.engineer = engineer;
+      if (dealer)   params.dealer   = dealer.trim();
+      if (fromDate) params.fromDate = fromDate;
+      if (toDate)   params.toDate   = toDate;
+
+      const res = await axios.get(`${API}/api/jobsheets/filter`, { params });
       setFilteredData(res.data);
     } catch (err) {
       console.error(err);
-      alert("Failed ❌");
+      alert("Failed to fetch data ❌");
+    } finally {
+      setLoading(false);
     }
   };
 
+  /* ── LOAD ALL ON MOUNT ── */
   useEffect(() => {
     fetchData();
   }, []);
 
-  /* FILTER */
-  const applyFilter = () => {
-    let filtered = [...data];
-
-    if (search) {
-      filtered = filtered.filter((item) =>
-        item.customer?.name?.toLowerCase().includes(search.toLowerCase()) ||
-        item.customer?.contact?.includes(search) ||
-        item.jobSheetNo?.toLowerCase().includes(search.toLowerCase()) ||
-        item.device?.imei?.includes(search)
-      );
-    }
-
-    if (fromDate && toDate) {
-      filtered = filtered.filter((item) => {
-        const date = new Date(item.createdAt)
-          .toISOString()
-          .slice(0, 10);
-        return date >= fromDate && date <= toDate;
-      });
-    }
-
-    if (fromDate && !toDate) {
-      filtered = filtered.filter((item) => {
-        const date = new Date(item.createdAt)
-          .toISOString()
-          .slice(0, 10);
-        return date === fromDate;
-      });
-    }
-
-    setFilteredData(filtered);
+  /* ── RESET FILTER ── */
+  const handleReset = () => {
+    setSearch("");
+    setStatus("");
+    setEngineer("");
+    setDealer("");
+    setFromDate("");
+    setToDate("");
+    setTimeout(() => {
+      axios.get(`${API}/api/jobsheets/filter`)
+        .then(res => setFilteredData(res.data))
+        .catch(err => console.error(err));
+    }, 100);
   };
 
+  /* ── PRINT ── */
   const handlePrint = () => window.print();
 
-  /* STATUS STYLE */
-  const getStatusStyle = (status) => {
-    if (status === "Delivered") return "bg-green-100 text-green-700";
-    if (status === "Pending") return "bg-yellow-100 text-yellow-700";
-    if (status === "Received") return "bg-blue-100 text-blue-700";
-    if (status === "Delivered NR/NA") return "bg-red-100 text-red-700";
-    return "bg-gray-100 text-gray-600";
+  /* ── EXCEL DOWNLOAD ── */
+  const handleExcelDownload = () => {
+    if (filteredData.length === 0) {
+      alert("No data to export ❌");
+      return;
+    }
+
+    const rows = filteredData.map((item, index) => ({
+      "SL No":            index + 1,
+      "Job Sheet No":     item.jobSheetNo || "-",
+      "Customer Name":    item.customer?.name || "-",
+      "Contact":          item.customer?.contact || "-",
+      "Alt Contact":      item.customer?.altContact || "-",
+      "Email":            item.customer?.email || "-",
+      "Address":          item.customer?.address || "-",
+      "Make":             item.device?.make || "-",
+      "Model":            item.device?.model || "-",
+      "IMEI":             item.device?.imei || "-",
+      "Warranty":         item.device?.warranty || "-",
+      "Status":           item.device?.mobileStatus || "-",
+      "Engineer":         item.service?.engineer || "-",
+      "Dealer":           item.service?.dealer || "-",
+      "Drawer":           item.service?.drawer || "-",
+      "Service Charge":   item.service?.serviceCharge || 0,
+      "Spare Charge":     item.service?.spareCharge || 0,
+      "Total":            (Number(item.service?.serviceCharge || 0) + Number(item.service?.spareCharge || 0)),
+      "Payment Mode":     item.service?.paymentMode || "-",
+      "Estimate":         item.service?.estimate || "-",
+      "Repair Date":      item.service?.repairDate ? new Date(item.service.repairDate).toLocaleDateString("en-IN") : "-",
+      "Delivery Date":    item.service?.deliveryDate ? new Date(item.service.deliveryDate).toLocaleDateString("en-IN") : "-",
+      "Problems":         item.visualIssues?.join(", ") || "-",
+      "Physical Condition": item.physicalCondition?.join(", ") || "-",
+      "Accessories":      item.accessories?.join(", ") || "-",
+      "Remarks":          item.service?.remarks || "-",
+      "Saved Date":       new Date(item.createdAt).toLocaleDateString("en-IN"),
+      "Created By":       item.createdBy?.username || "-",
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(rows);
+
+    /* Column widths */
+    ws["!cols"] = [
+      { wch: 6 }, { wch: 12 }, { wch: 18 }, { wch: 13 }, { wch: 13 },
+      { wch: 22 }, { wch: 22 }, { wch: 14 }, { wch: 16 }, { wch: 17 },
+      { wch: 12 }, { wch: 16 }, { wch: 14 }, { wch: 16 }, { wch: 12 },
+      { wch: 14 }, { wch: 12 }, { wch: 10 }, { wch: 13 }, { wch: 14 },
+      { wch: 13 }, { wch: 14 }, { wch: 28 }, { wch: 28 }, { wch: 22 },
+      { wch: 22 }, { wch: 13 }, { wch: 14 },
+    ];
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "All Reports");
+
+    const fileName = `All_Report_${fromDate || "all"}_to_${toDate || "all"}.xlsx`;
+    XLSX.writeFile(wb, fileName);
   };
 
+  /* ── STATUS BADGE ── */
+  const getStatusStyle = (s) => {
+    if (s === "Delivered")      return { background: "#d1fae5", color: "#065f46", padding: "2px 8px", borderRadius: "12px", fontSize: "11px", fontWeight: 600, whiteSpace: "nowrap" };
+    if (s === "Pending")        return { background: "#fef3c7", color: "#92400e", padding: "2px 8px", borderRadius: "12px", fontSize: "11px", fontWeight: 600, whiteSpace: "nowrap" };
+    if (s === "Received")       return { background: "#dbeafe", color: "#1e40af", padding: "2px 8px", borderRadius: "12px", fontSize: "11px", fontWeight: 600, whiteSpace: "nowrap" };
+    if (s === "Delivered NR/NA") return { background: "#fee2e2", color: "#991b1b", padding: "2px 8px", borderRadius: "12px", fontSize: "11px", fontWeight: 600, whiteSpace: "nowrap" };
+    return { background: "#f3f4f6", color: "#374151", padding: "2px 8px", borderRadius: "12px", fontSize: "11px", fontWeight: 600 };
+  };
+
+  /* ── TOTALS ── */
+  const totalService = filteredData.reduce((s, i) => s + Number(i.service?.serviceCharge || 0), 0);
+  const totalSpare   = filteredData.reduce((s, i) => s + Number(i.service?.spareCharge || 0), 0);
+  const totalAmount  = totalService + totalSpare;
+
+  /* ════════════════════════════════════════════════ */
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-100 to-gray-200 p-6">
+    <div style={{ minHeight: "100vh", background: "#f1f5f9", padding: "20px" }}>
 
-      {/* 🔥 HEADER */}
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold text-gray-800">
-          All Reports
-        </h1>
-        <p className="text-gray-500 text-sm">
-          Complete job sheet report overview
-        </p>
+      {/* ── HEADER ── */}
+      <div style={{ marginBottom: "16px" }}>
+        <h2 style={{ margin: 0, color: "#1e293b", fontWeight: 700 }}>📋 All Reports</h2>
+        <p style={{ margin: 0, color: "#64748b", fontSize: "13px" }}>Complete job sheet report overview</p>
       </div>
 
-      {/* 🔥 FILTER BAR */}
-      <div className="bg-white shadow-md rounded-xl p-4 mb-6 flex flex-wrap gap-3 items-center print:hidden">
+      {/* ── FILTER BAR ── */}
+      <div className="print-hidden" style={{
+        background: "#fff", borderRadius: "12px", padding: "16px",
+        marginBottom: "16px", boxShadow: "0 1px 4px rgba(0,0,0,0.08)"
+      }}>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: "10px", alignItems: "flex-end" }}>
 
-        <input
-          type="text"
-          placeholder="Search name / contact / job / IMEI"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="border p-2 rounded-lg focus:ring-2 focus:ring-blue-400"
-        />
-
-        <input
-          type="date"
-          value={fromDate}
-          onChange={(e) => setFromDate(e.target.value)}
-          className="border p-2 rounded-lg focus:ring-2 focus:ring-blue-400"
-        />
-
-        <input
-          type="date"
-          value={toDate}
-          onChange={(e) => setToDate(e.target.value)}
-          className="border p-2 rounded-lg focus:ring-2 focus:ring-blue-400"
-        />
-
-        <button
-          onClick={applyFilter}
-          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg shadow"
-        >
-          Apply Filter
-        </button>
-
-        <button
-          onClick={handlePrint}
-          className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg shadow"
-        >
-          Print / Download
-        </button>
-      </div>
-
-      {/* 🔥 REPORT CARD */}
-      <div className="bg-white rounded-xl shadow-lg border">
-
-        {/* HEADER */}
-        <div className="flex justify-between items-center flex-wrap gap-4 border-b p-4 bg-gray-50 rounded-t-xl">
-
-          <div className="text-gray-600 text-sm">
-            <span className="font-medium">Total Records:</span>{" "}
-            <span className="font-bold text-gray-800">
-              {filteredData.length}
-            </span>
+          {/* Search */}
+          <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+            <label style={{ fontSize: "11px", color: "#64748b", fontWeight: 600 }}>Search</label>
+            <input
+              type="text"
+              placeholder="Name / Contact / Job No / IMEI"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              onKeyDown={e => e.key === "Enter" && fetchData()}
+              style={{ border: "1px solid #cbd5e1", borderRadius: "8px", padding: "7px 10px", fontSize: "13px", width: "220px" }}
+            />
           </div>
 
-          <div className="text-sm text-gray-600 text-right">
-            <p><b>From:</b> {fromDate || "-"}</p>
-            <p><b>To:</b> {toDate || "-"}</p>
+          {/* Status */}
+          <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+            <label style={{ fontSize: "11px", color: "#64748b", fontWeight: 600 }}>Status</label>
+            <select
+              value={status}
+              onChange={e => setStatus(e.target.value)}
+              style={{ border: "1px solid #cbd5e1", borderRadius: "8px", padding: "7px 10px", fontSize: "13px", width: "150px" }}
+            >
+              <option value="">All Status</option>
+              <option value="Received">Received</option>
+              <option value="Pending">Pending</option>
+              <option value="Delivered">Delivered</option>
+              <option value="Delivered NR/NA">Delivered NR/NA</option>
+            </select>
           </div>
+
+          {/* Engineer */}
+          <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+            <label style={{ fontSize: "11px", color: "#64748b", fontWeight: 600 }}>Engineer</label>
+            <select
+              value={engineer}
+              onChange={e => setEngineer(e.target.value)}
+              style={{ border: "1px solid #cbd5e1", borderRadius: "8px", padding: "7px 10px", fontSize: "13px", width: "140px" }}
+            >
+              <option value="">All Engineers</option>
+              {engineerList.map((eng, i) => (
+                <option key={i} value={eng.name || eng}>{eng.name || eng}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Dealer */}
+          <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+            <label style={{ fontSize: "11px", color: "#64748b", fontWeight: 600 }}>Dealer</label>
+            <input
+              type="text"
+              placeholder="Dealer name"
+              value={dealer}
+              onChange={e => setDealer(e.target.value)}
+              style={{ border: "1px solid #cbd5e1", borderRadius: "8px", padding: "7px 10px", fontSize: "13px", width: "130px" }}
+            />
+          </div>
+
+          {/* From Date */}
+          <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+            <label style={{ fontSize: "11px", color: "#64748b", fontWeight: 600 }}>From Date</label>
+            <input
+              type="date"
+              value={fromDate}
+              onChange={e => setFromDate(e.target.value)}
+              style={{ border: "1px solid #cbd5e1", borderRadius: "8px", padding: "7px 10px", fontSize: "13px" }}
+            />
+          </div>
+
+          {/* To Date */}
+          <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+            <label style={{ fontSize: "11px", color: "#64748b", fontWeight: 600 }}>To Date</label>
+            <input
+              type="date"
+              value={toDate}
+              onChange={e => setToDate(e.target.value)}
+              style={{ border: "1px solid #cbd5e1", borderRadius: "8px", padding: "7px 10px", fontSize: "13px" }}
+            />
+          </div>
+
+          {/* Buttons */}
+          <button
+            onClick={fetchData}
+            disabled={loading}
+            style={{
+              background: "#2563eb", color: "#fff", border: "none",
+              borderRadius: "8px", padding: "8px 18px", fontWeight: 600,
+              fontSize: "13px", cursor: "pointer", display: "flex", alignItems: "center", gap: "6px"
+            }}
+          >
+            {loading ? "⏳ Loading..." : "🔍 Apply Filter"}
+          </button>
+
+          <button
+            onClick={handleReset}
+            style={{
+              background: "#64748b", color: "#fff", border: "none",
+              borderRadius: "8px", padding: "8px 14px", fontWeight: 600,
+              fontSize: "13px", cursor: "pointer"
+            }}
+          >
+            ↺ Reset
+          </button>
+
+          <button
+            onClick={handleExcelDownload}
+            style={{
+              background: "#16a34a", color: "#fff", border: "none",
+              borderRadius: "8px", padding: "8px 14px", fontWeight: 600,
+              fontSize: "13px", cursor: "pointer"
+            }}
+          >
+            📥 Excel Download
+          </button>
+
+          <button
+            onClick={handlePrint}
+            style={{
+              background: "#0891b2", color: "#fff", border: "none",
+              borderRadius: "8px", padding: "8px 14px", fontWeight: 600,
+              fontSize: "13px", cursor: "pointer"
+            }}
+          >
+            🖨️ Print
+          </button>
 
         </div>
+      </div>
 
-        {/* 🔥 TABLE */}
-        <div className="overflow-auto max-h-[500px]">
-          <table className="w-full text-sm border-collapse">
+      {/* ── SUMMARY ROW ── */}
+      <div style={{ display: "flex", gap: "12px", marginBottom: "14px", flexWrap: "wrap" }}>
+        {[
+          { label: "Total Records", value: filteredData.length, color: "#2563eb" },
+          { label: "Service Charge", value: `₹${totalService.toLocaleString("en-IN")}`, color: "#7c3aed" },
+          { label: "Spare Charge",   value: `₹${totalSpare.toLocaleString("en-IN")}`,   color: "#db2777" },
+          { label: "Total Amount",   value: `₹${totalAmount.toLocaleString("en-IN")}`,  color: "#059669" },
+        ].map((s, i) => (
+          <div key={i} style={{
+            background: "#fff", borderRadius: "10px", padding: "10px 18px",
+            boxShadow: "0 1px 4px rgba(0,0,0,0.07)", minWidth: "140px"
+          }}>
+            <div style={{ fontSize: "11px", color: "#64748b", fontWeight: 600 }}>{s.label}</div>
+            <div style={{ fontSize: "20px", fontWeight: 700, color: s.color }}>{s.value}</div>
+          </div>
+        ))}
+        <div style={{
+          background: "#fff", borderRadius: "10px", padding: "10px 18px",
+          boxShadow: "0 1px 4px rgba(0,0,0,0.07)", fontSize: "12px", color: "#64748b",
+          display: "flex", flexDirection: "column", justifyContent: "center"
+        }}>
+          <div><b>From:</b> {fromDate || "-"}</div>
+          <div><b>To:</b>   {toDate   || "-"}</div>
+        </div>
+      </div>
 
-            <thead className="sticky top-0 bg-gray-100 z-10">
-              <tr className="text-gray-700">
-                <th className="p-3 border">SL No</th>
-                <th className="p-3 border">Name</th>
-                <th className="p-3 border">Contact</th>
-                <th className="p-3 border">Saved Date</th>
-                <th className="p-3 border">Delivered Date</th>
-                <th className="p-3 border">Engineer</th>
-                <th className="p-3 border">Status</th>
-                <th className="p-3 border">Model</th>
-                <th className="p-3 border">Problem</th>
+      {/* ── TABLE ── */}
+      <div style={{
+        background: "#fff", borderRadius: "12px",
+        boxShadow: "0 1px 6px rgba(0,0,0,0.08)", border: "1px solid #e2e8f0", overflow: "hidden"
+      }}>
+        <div style={{ overflowX: "auto", maxHeight: "62vh", overflowY: "auto" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "12px" }}>
+
+            <thead style={{ position: "sticky", top: 0, zIndex: 10 }}>
+              <tr style={{ background: "#1e293b", color: "#fff" }}>
+                {[
+                  "SL", "Job No", "Name", "Contact", "Alt Contact",
+                  "Make", "Model", "IMEI", "Warranty", "Status",
+                  "Engineer", "Dealer", "Drawer",
+                  "Svc ₹", "Spare ₹", "Total ₹", "Payment",
+                  "Problems", "Physical Cond.", "Accessories",
+                  "Repair Date", "Delivery Date", "Remarks",
+                  "Saved Date", "Created By"
+                ].map((h, i) => (
+                  <th key={i} style={{
+                    padding: "10px 8px", textAlign: "left", fontWeight: 600,
+                    fontSize: "11px", whiteSpace: "nowrap", borderRight: "1px solid #334155"
+                  }}>{h}</th>
+                ))}
               </tr>
             </thead>
 
             <tbody>
-              {filteredData.length > 0 ? (
-                filteredData.map((item, index) => (
-                  <tr
-                    key={index}
-                    className={`border-b hover:bg-gray-50 ${
-                      index % 2 === 0 ? "bg-white" : "bg-gray-50"
-                    }`}
-                  >
-                    <td className="p-2 border">{index + 1}</td>
-
-                    <td className="p-2 border font-medium text-gray-700">
-                      {item.customer?.name || "-"}
-                    </td>
-
-                    <td className="p-2 border">
-                      {item.customer?.contact || "-"}
-                    </td>
-
-                    <td className="p-2 border">
-                      {new Date(item.createdAt).toISOString().slice(0, 10)}
-                    </td>
-
-                    <td className="p-2 border">
-                      {item.service?.deliveryDate
-                        ? new Date(item.service.deliveryDate)
-                            .toLocaleDateString("en-CA")
-                        : "-"}
-                    </td>
-
-                    <td className="p-2 border">
-                      {item.service?.engineer || "-"}
-                    </td>
-
-                    <td className="p-2 border">
-                      <span
-                        className={`px-2 py-1 rounded-full text-xs font-semibold ${getStatusStyle(
-                          item.device?.mobileStatus
-                        )}`}
-                      >
-                        {item.device?.mobileStatus || "-"}
-                      </span>
-                    </td>
-
-                    <td className="p-2 border">
-                      {item.device?.model || "-"}
-                    </td>
-
-                    <td className="p-2 border">
-                      {item.visualIssues?.join(", ") || "-"}
-                    </td>
-
-                  </tr>
-                ))
+              {loading ? (
+                <tr>
+                  <td colSpan="25" style={{ textAlign: "center", padding: "40px", color: "#64748b" }}>
+                    ⏳ Loading...
+                  </td>
+                </tr>
+              ) : filteredData.length > 0 ? (
+                filteredData.map((item, index) => {
+                  const svc   = Number(item.service?.serviceCharge || 0);
+                  const spare = Number(item.service?.spareCharge   || 0);
+                  const rowBg = index % 2 === 0 ? "#fff" : "#f8fafc";
+                  const td    = { padding: "8px 8px", borderBottom: "1px solid #e2e8f0", borderRight: "1px solid #e2e8f0", whiteSpace: "nowrap", color: "#1e293b" };
+                  return (
+                    <tr key={index} style={{ background: rowBg }} onMouseEnter={e => e.currentTarget.style.background = "#eff6ff"} onMouseLeave={e => e.currentTarget.style.background = rowBg}>
+                      <td style={{ ...td, color: "#64748b" }}>{index + 1}</td>
+                      <td style={{ ...td, fontWeight: 700, color: "#2563eb" }}>{item.jobSheetNo || "-"}</td>
+                      <td style={{ ...td, fontWeight: 600 }}>{item.customer?.name || "-"}</td>
+                      <td style={td}>{item.customer?.contact || "-"}</td>
+                      <td style={td}>{item.customer?.altContact || "-"}</td>
+                      <td style={td}>{item.device?.make || "-"}</td>
+                      <td style={td}>{item.device?.model || "-"}</td>
+                      <td style={td}>{item.device?.imei || "-"}</td>
+                      <td style={td}>{item.device?.warranty || "-"}</td>
+                      <td style={td}>
+                        <span style={getStatusStyle(item.device?.mobileStatus)}>
+                          {item.device?.mobileStatus || "-"}
+                        </span>
+                      </td>
+                      <td style={td}>{item.service?.engineer || "-"}</td>
+                      <td style={td}>{item.service?.dealer || "-"}</td>
+                      <td style={td}>{item.service?.drawer || "-"}</td>
+                      <td style={{ ...td, color: "#7c3aed", fontWeight: 600 }}>₹{svc.toLocaleString("en-IN")}</td>
+                      <td style={{ ...td, color: "#db2777", fontWeight: 600 }}>₹{spare.toLocaleString("en-IN")}</td>
+                      <td style={{ ...td, color: "#059669", fontWeight: 700 }}>₹{(svc + spare).toLocaleString("en-IN")}</td>
+                      <td style={td}>{item.service?.paymentMode || "-"}</td>
+                      <td style={{ ...td, maxWidth: "160px", whiteSpace: "normal", wordBreak: "break-word" }}>
+                        {item.visualIssues?.filter(Boolean).join(", ") || "-"}
+                      </td>
+                      <td style={{ ...td, maxWidth: "160px", whiteSpace: "normal", wordBreak: "break-word" }}>
+                        {item.physicalCondition?.join(", ") || "-"}
+                      </td>
+                      <td style={{ ...td, maxWidth: "120px", whiteSpace: "normal", wordBreak: "break-word" }}>
+                        {item.accessories?.join(", ") || "-"}
+                      </td>
+                      <td style={td}>
+                        {item.service?.repairDate
+                          ? new Date(item.service.repairDate).toLocaleDateString("en-IN")
+                          : "-"}
+                      </td>
+                      <td style={td}>
+                        {item.service?.deliveryDate
+                          ? new Date(item.service.deliveryDate).toLocaleDateString("en-IN")
+                          : "-"}
+                      </td>
+                      <td style={{ ...td, maxWidth: "140px", whiteSpace: "normal", wordBreak: "break-word" }}>
+                        {item.service?.remarks || "-"}
+                      </td>
+                      <td style={td}>
+                        {new Date(item.createdAt).toLocaleDateString("en-IN")}
+                      </td>
+                      <td style={td}>{item.createdBy?.username || "-"}</td>
+                    </tr>
+                  );
+                })
               ) : (
                 <tr>
-                  <td colSpan="9" className="text-center p-6 text-gray-400">
-                    No Data Found
+                  <td colSpan="25" style={{ textAlign: "center", padding: "50px", color: "#94a3b8", fontSize: "15px" }}>
+                    📭 No Data Found
                   </td>
                 </tr>
               )}
             </tbody>
 
+            {/* FOOTER TOTALS */}
+            {filteredData.length > 0 && (
+              <tfoot>
+                <tr style={{ background: "#1e293b", color: "#fff", fontWeight: 700 }}>
+                  <td colSpan="13" style={{ padding: "10px 8px", textAlign: "right", fontSize: "12px" }}>
+                    TOTAL ({filteredData.length} records):
+                  </td>
+                  <td style={{ padding: "10px 8px", color: "#c4b5fd" }}>₹{totalService.toLocaleString("en-IN")}</td>
+                  <td style={{ padding: "10px 8px", color: "#f9a8d4" }}>₹{totalSpare.toLocaleString("en-IN")}</td>
+                  <td style={{ padding: "10px 8px", color: "#6ee7b7" }}>₹{totalAmount.toLocaleString("en-IN")}</td>
+                  <td colSpan="9"></td>
+                </tr>
+              </tfoot>
+            )}
+
           </table>
         </div>
       </div>
 
-      {/* PRINT */}
-      <style>
-        {`
-          @media print {
-            .print\\:hidden {
-              display: none;
-            }
-            body {
-              background: white;
-            }
-          }
-        `}
-      </style>
+      {/* ── PRINT STYLES ── */}
+      <style>{`
+        @media print {
+          .print-hidden { display: none !important; }
+          body { background: white; font-size: 11px; }
+          table { font-size: 10px; }
+          th, td { padding: 4px 5px !important; }
+        }
+      `}</style>
 
     </div>
   );
