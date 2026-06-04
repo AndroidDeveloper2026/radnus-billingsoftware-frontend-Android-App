@@ -613,6 +613,7 @@ const getWorkloadBadge = (engName) => {
               <option value="">All Status</option>
               <option value="Received">Received</option>
               <option value="Pending">Pending</option>
+              <option value="Repaired">Repaired</option>
               <option value="Delivered">Delivered</option>
               <option value="Delivered NR/NA">Delivered NR/NA</option>
             </select>
@@ -907,6 +908,7 @@ const getWorkloadBadge = (engName) => {
                   <option value="">All Status</option>
                   <option value="Received">Received</option>
                   <option value="Pending">Pending</option>
+                  <option value="Repaired">Repaired</option>
                   <option value="Delivered">Delivered</option>
                   <option value="Delivered NR/NA">Delivered NR/NA</option>
                 </select>
@@ -1332,7 +1334,8 @@ const getWorkloadBadge = (engName) => {
                 alert("Please save Job Sheet first");
                 return;
               }
-              window.open(`${window.location.origin}/estimate-bill/${editData._id}`, "_blank");
+            
+             window.open(`${window.location.origin}/estimate-bill/${editData._id}`, "_blank");
             }}
           >
             Estimate
@@ -1348,6 +1351,7 @@ const getWorkloadBadge = (engName) => {
               }
 
               try {
+                 window.open(`${window.location.origin}/invoice/${localEditData._id}`, "_blank");
                 await axios.put(
                   `${API}/api/jobsheets/${localEditData._id}/invoice`
                 );

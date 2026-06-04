@@ -39,14 +39,14 @@ const InvoiceBill = () => {
 
   const grandTotal = subTotal;
 
-  const paymentLabel =
-    job.service?.paymentMode === "Cash"
-      ? "CASH MEMO"
-      : job.service?.paymentMode === "UPI"
-      ? "UPI BILL"
-      : job.service?.paymentMode === "Card"
-      ? "CARD BILL"
-      : "BILL";
+ const paymentLabel =
+  job.service?.paymentMode === "Cash"
+    ? "INVOICE BILL / CASH"
+    : job.service?.paymentMode === "UPI"
+    ? "INVOICE BILL / UPI"
+    : job.service?.paymentMode === "Card"
+    ? "INVOICE BILL / CARD"
+    : "INVOICE BILL";
 
   const downloadPDF = () => {
     const element = document.getElementById("invoice");
@@ -106,7 +106,7 @@ overflow: "hidden",
             }}
           >
             <div>
-              <b>{paymentLabel} / BILL</b>
+              <b>{paymentLabel} </b>
             </div>
 
             {/* CONTACT INFO */}
