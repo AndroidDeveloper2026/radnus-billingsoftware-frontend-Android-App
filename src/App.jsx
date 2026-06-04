@@ -21,6 +21,8 @@ import InvoiceBill from "./components/InvoiceBill";
 import UserReportPage from "./components/reports/UserReportPage";
 import UserListPopup from "./components/popups/UserListPopup";
 import SpareReportPage from "./components/reports/SpareReportPage";
+import EngineerDashboard from "./components/EngineerDashboard";
+import RebillReportPage from "./components/reports/RebillReportPage";
 import './App.css';
 
 function App() {
@@ -30,13 +32,11 @@ function App() {
         <Route path="/" element={<Firstpage />} />
         <Route path="/home" element={<Home />} />
 
-        {/* ✅ /jobsheet → /jobsheet/new redirect */}
+        {/* ✅ Dynamic engineer route - /engineer/ajith, /engineer/barani */}
+        <Route path="/engineer/:name" element={<EngineerDashboard />} />
+
         <Route path="/jobsheet" element={<Navigate to="/jobsheet/new" replace />} />
-
-        {/* ✅ NEW — empty form, Save button */}
         <Route path="/jobsheet/new" element={<JobSheetPage isEdit={false} editData={null} />} />
-
-        {/* ✅ EDIT — filled form, Update button */}
         <Route path="/jobsheet/:id" element={<JobSheetEditWrapper />} />
 
         <Route path="/estimate-bill/:id" element={<EstimateBill />} />
@@ -54,6 +54,7 @@ function App() {
         <Route path="/engineer-all-report" element={<EngineerReportPage />} />
         <Route path="/dealer-report" element={<DealerReportPage />} />
         <Route path="/user-report" element={<UserReportPage />} />
+        <Route path="/rebill-report" element={<RebillReportPage />} />
         <Route path="/user-list" element={<UserListPopup />} />
         <Route path="/spare-report" element={<SpareReportPage />} />
       </Routes>

@@ -4,9 +4,15 @@ import makeModelData from "../data/makeModelData";
 import JobSheetSearchModal from "./JobSheetSearchModal";
 import SparePopup from "./SparePopup";
 import Select from "react-select";
+import RepairStepsTimeline from "./RepairStepsTimeline";
 import { useNavigate } from "react-router-dom";
 const isValidEmail = (email) =>
   /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+
+const isValidPhone = (phone) => /^\d{10}$/.test(phone);
+const isValidIMEI = (imei) => /^\d{15}$/.test(imei);
+const isRequired = (value) => value && value.toString().trim().length > 0;
+const MAX_JOBS = 5;
 const onlyNumbers = (value) => value.replace(/\D/g, "");
 const JobSheetPage = ({ editData = null, isEdit = false }) => {
   const [makeList, setMakeList] = useState([]);
@@ -14,9 +20,47 @@ const JobSheetPage = ({ editData = null, isEdit = false }) => {
   const navigate = useNavigate();
   const [jobSheetNo, setJobSheetNo] = useState("");
   const [saving, setSaving] = useState(false);
+  const [rebilling, setRebilling] = useState(false);
   const pendingNextNo = React.useRef(null);
   const API = import.meta.env.VITE_API_URL;
 const [customFaults, setCustomFaults] = useState([]);
+
+  /* ================= VALIDATION (NEW) ================= */
+  const [touched, setTouched] = useState({});
+  const [formErrors, setFormErrors] = useState({});
+ 
+
+  const validateField = (name, value) => {
+    switch (name) {
+      case "customerName":
+        return !value?.trim() ? "Customer Name is required" : "";
+      case "contact":
+        return !value ? "Contact No is required"
+          : !/^\d{10}$/.test(value) ? "Must be exactly 10 digits" : "";
+      case "email":
+        return value && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)
+          ? "Invalid email format" : "";
+      default:
+        return "";
+    }
+  };
+
+  const handleBlur = (name, value) => {
+    setTouched(prev => ({ ...prev, [name]: true }));
+    setFormErrors(prev => ({ ...prev, [name]: validateField(name, value) }));
+  };
+
+  const validateAll = () => {
+    const errors = {
+      customerName: validateField("customerName", customerName),
+      contact: validateField("contact", contact),
+      email: validateField("email", email),
+    };
+    setFormErrors(errors);
+    setTouched({ customerName: true, contact: true, email: true });
+   return !Object.values(errors).some(Boolean);
+  };
+
   /* ================= TIME ================= */
   const [now, setNow] = useState(new Date());
   useEffect(() => {
@@ -114,6 +158,27 @@ const [customFaults, setCustomFaults] = useState([]);
     );
   };
 
+
+
+
+/* ── WORKLOAD MAP: { "Barani": 4, "Ajith": 5 } ── */
+  const [workloadMap, setWorkloadMap] = useState({});
+ 
+  useEffect(() => {
+    axios.get(`${API}/api/engineers`)
+      .then(res => setEngineerList(res.data));
+  }, []);
+ 
+  // Fetch workload whenever page loads
+  useEffect(() => {
+    axios.get(`${API}/api/jobsheets/workload`)
+      .then(res => {
+        const map = {};
+        res.data.forEach(e => { map[e.name] = e.activeJobs; });
+        setWorkloadMap(map);
+      })
+      .catch(err => console.error("Workload fetch error:", err));
+  }, []); 
   /* ================= SERVICE ================= */
   const today = new Date().toISOString().split("T")[0];
   const [engineer, setEngineer] = useState("");
@@ -155,13 +220,35 @@ const [customFaults, setCustomFaults] = useState([]);
   const removeIssue = (i) =>
     setVisualIssues(visualIssues.filter((_, idx) => idx !== i));
 
+
+const validateForm = () => {
+  const errors = [];
+
+  if (!isRequired(customerName)) errors.push("Customer Name is required");
+  if (!isValidPhone(contact)) errors.push("Contact No must be exactly 10 digits");
+
+
+  // Date validation
+  if (repairDate && deliveryDate && new Date(deliveryDate) < new Date(repairDate)) {
+    errors.push("Delivery Date cannot be before Repair Date");
+  }
+
+  return errors;
+};
+
+
   /* ================= UPDATE ================= */
- const handleUpdate = async () => {
-    if (email && !isValidEmail(email)) {
-      alert("Please enter valid Email ID ❌");
+const handleUpdate = async () => {
+    // ✅ NEW: inline validation
+    if (!validateAll()) {
+      window.scrollTo({ top: 0, behavior: "smooth" });
       return;
     }
-
+    // ✅ ORIGINAL: date validation still runs
+    if (repairDate && deliveryDate && new Date(deliveryDate) < new Date(repairDate)) {
+      alert("⚠️ Delivery Date cannot be before Repair Date");
+      return;
+    }
     try {
       const formData = new FormData();
 
@@ -228,206 +315,60 @@ const [customFaults, setCustomFaults] = useState([]);
 
   /* ================= SAVE ================= */
 
-  const handleSave = async () => {
+ const handleSave = async () => {
 
     // 🛑 DOUBLE CLICK STOP
     if (saving) return;
 
-    setSaving(true);
+    // ✅ NEW: inline validation replaces alert-based
+    if (!validateAll()) {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      return;
+    }
+    // ✅ ORIGINAL: date validation still runs
+    if (repairDate && deliveryDate && new Date(deliveryDate) < new Date(repairDate)) {
+      alert("⚠️ Delivery Date cannot be before Repair Date");
+      return;
+    }
+
+   setSaving(true);
 
     const user = JSON.parse(localStorage.getItem("user"));
 
-    // ✅ EMAIL VALIDATION
-    if (email && !isValidEmail(email)) {
-      alert("Please enter valid Email ID ❌");
-      setSaving(false);
-      return;
-    }
     try {
-
-      const currentJobSheetNo = jobSheetNo;
-// 🔥 AUTO ADD MAKE (USER INPUT)
-if (make === "__custom" && customMake) {
-  try {
-    await axios.post(`${API}/api/makes`, {
-      name: customMake,
-    });
-  } catch (err) {
-    console.log("Make already exists or error");
-  }
-}
-
-// 🔥 AUTO ADD MODEL (USER INPUT)
-if (model === "__custom" && customModel && customMake) {
-  try {
-    await axios.post(`${API}/api/models`, {
-      name: customModel,
-      make: customMake,
-    });
-  } catch (err) {
-    console.log("Model already exists or error");
-  }
-}
-// 🔥 AUTO ADD ONLY NEW FAULT (CASE-INSENSITIVE)
-for (let f of visualIssues) {
-  if (
-    f &&
-    !faultList.some(
-      fl => fl.name.toLowerCase() === f.toLowerCase()
-    )
-  ) {
-    try {
-      await axios.post(`${API}/api/faults`, {
-        name: f,
-      });
-    } catch (err) {
-      console.log("Fault exists or error");
-    }
-  }
-}
       const formData = new FormData();
-
-      /* ================= BASIC ================= */
-      formData.append("jobSheetNo", currentJobSheetNo);
-
-      /* ================= CUSTOMER ================= */
-      formData.append(
-        "customer",
-        JSON.stringify({
-          name: customerName,
-          contact,
-          altContact,
-          address,
-          email, 
-        })
-      );
-
-      formData.append(
-        "createdBy",
-        JSON.stringify({
-          username: user?.username || "unknown",
-          role: user?.role || "user"
-        })
-      );
-
-      /* ================= DEVICE ================= */
-      formData.append(
-        "device",
-        JSON.stringify({
-          make: make === "__custom" ? customMake : make,
-          model: model === "__custom" ? customModel : model,
-          imei,
-          warranty,
-          pattern,
-          mobileStatus,
-        })
-      );
-
-      /* ================= ARRAYS ================= */
-      formData.append(
-        "physicalCondition",
-        JSON.stringify(physicalCondition)
-      );
-
-      formData.append(
-        "accessories",
-        JSON.stringify(accessories)
-      );
-
-      formData.append(
-        "visualIssues",
-        JSON.stringify(visualIssues.filter(Boolean))
-      );
-
-      /* ================= SERVICE ================= */
-      formData.append(
-        "service",
-        JSON.stringify({
-          engineer,
-          dealer,
-          drawer,
-          serviceCharge: Number(serviceCharge || 0), // ✅ safe
-          spareCharge: Number(spareCharge || 0),     // ✅ safe
-          estimate,
-          paymentMode,
-          repairDate,
-          deliveryDate,
-          remarks,
-        })
-      );
-
-      formData.append(
-        "spareItems",
-        JSON.stringify(spareItems)
-      );
-
-      /* ================= ID PROOF ================= */
+      formData.append("jobSheetNo", jobSheetNo);
+      formData.append("customer", JSON.stringify({ name: customerName, contact, altContact, address, email }));
+      formData.append("device", JSON.stringify({ make: make === "__custom" ? customMake : make, model: model === "__custom" ? customModel : model, imei, warranty, pattern, mobileStatus }));
+      formData.append("physicalCondition", JSON.stringify(physicalCondition));
+      formData.append("accessories", JSON.stringify(accessories));
+      formData.append("visualIssues", JSON.stringify(visualIssues.filter(Boolean)));
+      formData.append("service", JSON.stringify({ engineer, dealer, drawer, serviceCharge: Number(serviceCharge || 0), spareCharge: Number(spareCharge || 0), estimate, paymentMode, repairDate, deliveryDate, remarks }));
+      formData.append("spareItems", JSON.stringify(spareItems));
       formData.append("idProofType", idProofType);
+      if (idProofImage) formData.append("idProofImage", idProofImage);
+      if (user) formData.append("createdBy", user.username);
 
-      if (idProofImage) {
-        formData.append("idProofImage", idProofImage);
-      }
+      const res = await axios.post(`${API}/api/jobsheets`, formData, {
+        headers: { "Content-Type": "multipart/form-data" }
+      });
 
-      /* ================= API CALL ================= */
-      await axios.post(
-        `${API}/api/jobsheets`,
-        formData,
-        {
-          headers: {
-            "Content-Type": "multipart/form-data",
-          },
-        }
-      );
+      alert("Job Sheet Saved ✅");
 
-      /* ================= JOB NUMBER INCREMENT ================= */
-      // // get next job number from DB
-      // axios.get(`${API}/api/jobsheets/next-number`)
-      //   .then(res => setJobSheetNo(res.data.next))
-      //   .catch(err => console.error(err));
-
-      // alert("Job Sheet Saved Successfully ✅");
-
-      // handleNew();
-
-     alert("Job Sheet Saved Successfully ✅");
-// 🔄 REFRESH MODEL LIST
-const selectedMake = make === "__custom" ? customMake : make;
-
-if (selectedMake) {
-  axios.get(`${API}/api/models/${selectedMake}`)
-    .then(res => setModelList(res.data));
-}
-axios.get(`${API}/api/faults`)
-  .then(res => setFaultList(res.data));
-setTimeout(() => {
-  axios.get(`${API}/api/jobsheets/next-number`)
-    .then(res => {
-      handleNew(res.data.next);
-    })
-    .catch(err => console.error(err));
-}, 300); // 300ms delay
-
-    
+      const next = await axios.get(`${API}/api/jobsheets/next-number`);
+      handleNew(next.data.next);
 
     } catch (err) {
       console.error(err);
-
-      // 🔥 DUPLICATE ERROR HANDLE (MERGED)
-      if (err.response?.data?.code === 11000) {
-        alert("JobSheet No already exists ❌");
-      } else {
-        alert("Save failed ❌");
-      }
-
+      alert("Save failed ❌");
     } finally {
-      setSaving(false); // 🔥 RESET ALWAYS
+      setSaving(false);
     }
-  };
-
+  };   // ← handleSave ends here
 
   /* ================= NEW ================= */
 
- const handleNew = (nextNo = null) => {
+  const handleNew = (nextNo = null) => {
     // ✅ clear all fields
     setCustomerName("");
     
@@ -462,6 +403,11 @@ setTimeout(() => {
     setEstimate("");
     setPaymentMode("");
     setRemarks("");
+
+    // ✅ NEW: reset validation state too
+    setTouched({});
+    setFormErrors({});
+    setShowErrorBanner(false);
 
     const today = new Date().toISOString().split("T")[0];
     setRepairDate(today);
@@ -605,8 +551,31 @@ const modelOptions = [
   ...extraModel,
   { label: "Other (Add New)", value: "__custom" }
 ];
+/* ── WORKLOAD BADGE HELPER ── */
+const getWorkloadBadge = (engName) => {
+  const count = workloadMap[engName] || 0;
+  const free  = MAX_JOBS - count;
+
+  if (count >= MAX_JOBS)
+    return {
+      label: `${engName} (FULL 🔴)`,
+      disabled: true
+    };
+
+  if (count >= 4)
+    return {
+      label: `${engName} (${free} slot ⚠️)`,
+      disabled: false
+    };
+
+  return {
+    label: `${engName} (${free} free ✅)`,
+    disabled: false
+  };
+};
   return (
     <div className="container-fluid bg-light min-vh-100 p-3">
+
 
       {/* HEADER */}
       <div className="card shadow-sm mb-3">
@@ -762,24 +731,57 @@ const modelOptions = [
           <div className="card shadow-sm mb-3">
             <div className="card-header fw-bold">Customer Details</div>
             <div className="card-body row g-2">
+
+              {/* ── Customer Name (VALIDATION ADDED) ── */}
               <div className="col-md-4">
                 <input
-                  className="form-control form-control-sm"
-                  placeholder="Customer Name"
+                  className={`form-control form-control-sm ${
+                    touched.customerName && formErrors.customerName ? "is-invalid" :
+                    touched.customerName && !formErrors.customerName ? "is-valid" : ""
+                  }`}
+                  placeholder="Customer Name *"
                   value={customerName}
-                  onChange={(e) => setCustomerName(e.target.value)}
+                  onChange={(e) => {
+                    setCustomerName(e.target.value);
+                    if (touched.customerName)
+                      setFormErrors(prev => ({ ...prev, customerName: validateField("customerName", e.target.value) }));
+                  }}
+                  onBlur={(e) => handleBlur("customerName", e.target.value)}
                 />
+                {touched.customerName && formErrors.customerName && (
+                  <div className="invalid-feedback d-block" style={{ fontSize: 11 }}>⚠️ {formErrors.customerName}</div>
+                )}
+                {touched.customerName && !formErrors.customerName && customerName && (
+                  <div style={{ fontSize: 11, color: "#198754" }}>✅ Looks good!</div>
+                )}
               </div>
+
+              {/* ── Contact No (VALIDATION ADDED) ── */}
               <div className="col-md-4">
                 <input
-                  className="form-control form-control-sm"
+                  className={`form-control form-control-sm ${
+                    touched.contact && formErrors.contact ? "is-invalid" :
+                    touched.contact && !formErrors.contact && contact ? "is-valid" : ""
+                  }`}
                   placeholder="Contact No *"
                   value={contact}
                   maxLength={10}
-                  onChange={(e) => setContact(onlyNumbers(e.target.value))}
+                  onChange={(e) => {
+                    const val = onlyNumbers(e.target.value);
+                    setContact(val);
+                    if (touched.contact)
+                      setFormErrors(prev => ({ ...prev, contact: validateField("contact", val) }));
+                  }}
+                  onBlur={(e) => handleBlur("contact", e.target.value)}
                 />
-
+                {touched.contact && formErrors.contact && (
+                  <div className="invalid-feedback d-block" style={{ fontSize: 11 }}>⚠️ {formErrors.contact}</div>
+                )}
+                {touched.contact && !formErrors.contact && contact && (
+                  <div style={{ fontSize: 11, color: "#198754" }}>✅ Valid number</div>
+                )}
               </div>
+
               <div className="col-md-4">
                 <input
                   className="form-control form-control-sm"
@@ -800,21 +802,30 @@ const modelOptions = [
                 />
               </div>
 
+              {/* ── Email (VALIDATION ADDED) ── */}
               <div className="col-md-4">
                 <input
                   type="email"
-                  className={`form-control form-control-sm ${email && !isValidEmail(email) ? "is-invalid" : ""
-                    }`}
+                  className={`form-control form-control-sm ${
+                    touched.email && formErrors.email ? "is-invalid" :
+                    touched.email && !formErrors.email && email ? "is-valid" : ""
+                  }`}
                   placeholder="Email ID"
                   value={email}
-                  onChange={(e) => setEmail(e.target.value.trim().toLowerCase())}
-
+                  onChange={(e) => {
+                    const val = e.target.value.trim().toLowerCase();
+                    setEmail(val);
+                    if (touched.email)
+                      setFormErrors(prev => ({ ...prev, email: validateField("email", val) }));
+                  }}
+                  onBlur={(e) => handleBlur("email", e.target.value.trim())}
                 />
-
-                {email && !isValidEmail(email) && (
-                  <div className="text-danger small">Invalid email format</div>
+                {touched.email && formErrors.email && (
+                  <div className="invalid-feedback d-block" style={{ fontSize: 11 }}>⚠️ {formErrors.email}</div>
                 )}
-
+                {touched.email && !formErrors.email && email && (
+                  <div style={{ fontSize: 11, color: "#198754" }}>✅ Valid email</div>
+                )}
               </div>
 
             </div>
@@ -987,21 +998,47 @@ const modelOptions = [
                 <div className="row g-2">
 
                   {/* Engineer – DROPDOWN */}
-                  <div className="col-md-4">
+                <div className="col-md-4">
                     <select
                       className="form-select form-select-sm"
                       value={engineer}
-                      onChange={(e) => setEngineer(e.target.value)}
+                      onChange={e => setEngineer(e.target.value)}
+                      style={{ borderColor: engineer && (workloadMap[engineer] || 0) >= MAX_JOBS ? "#ef4444" : "" }}
                     >
                       <option value="">Select Engineer</option>
-
-                     {engineerList.map((eng, i) => (
-  <option key={i} value={eng.name || eng}>
-    {eng.name || eng}
-  </option>
-))}
+                      {engineerList.map((eng, i) => {
+                        const name  = eng.name || eng;
+                        const badge = getWorkloadBadge(name);
+                        return (
+                          <option key={i} value={name} disabled={badge.disabled}>
+                            {badge.label}
+                          </option>
+                        );
+                      })}
                     </select>
+ 
+                    {/* WORKLOAD STATUS UNDER DROPDOWN */}
+                    {engineer && (() => {
+                      const count = workloadMap[engineer] || 0;
+                      const free  = MAX_JOBS - count;
+                      if (count >= MAX_JOBS) return (
+                        <div style={{ marginTop: 5, fontSize: 11, fontWeight: 600, color: "#991b1b", background: "#fee2e2", borderRadius: 6, padding: "3px 8px", display: "flex", alignItems: "center", gap: 4 }}>
+                          🔴 Full capacity — choose another engineer
+                        </div>
+                      );
+                      if (count >= 4) return (
+                        <div style={{ marginTop: 5, fontSize: 11, fontWeight: 600, color: "#92400e", background: "#fef3c7", borderRadius: 6, padding: "3px 8px", display: "flex", alignItems: "center", gap: 4 }}>
+                          ⚠️ {count}/{MAX_JOBS} jobs — {free} slot left
+                        </div>
+                      );
+                      return (
+                        <div style={{ marginTop: 5, fontSize: 11, fontWeight: 500, color: "#166534", background: "#dcfce7", borderRadius: 6, padding: "3px 8px", display: "flex", alignItems: "center", gap: 4 }}>
+                          ✅ {count}/{MAX_JOBS} jobs — {free} slots free
+                        </div>
+                      );
+                    })()}
                   </div>
+ 
 
                   {/* Dealer – TEXTBOX */}
                   <div className="col-md-4">
@@ -1228,19 +1265,56 @@ const modelOptions = [
             </button>
           )}
 
-          {/* UPDATE (LOCK CONDITION) */}
-          {isEdit && !localEditData?.isInvoiced && (
-            <button className="btn btn-warning btn-sm" onClick={handleUpdate}>
-              Update
-            </button>
-          )}
-
-          {/* LOCK MESSAGE */}
-          {isEdit && localEditData?.isInvoiced && (
-            <div className="alert alert-danger text-center mb-0 p-1">
-              🔒 Invoice Generated — Edit Disabled
-            </div>
-          )}
+        {/* UPDATE (LOCK CONDITION) */}
+{isEdit && (!localEditData?.isInvoiced || localEditData?.rebillPending) && (
+  <button className="btn btn-warning btn-sm" onClick={handleUpdate}>
+    {localEditData?.rebillPending ? "💾 Save Rebill" : "Update"}
+  </button>
+)}
+         {/* LOCK MESSAGE + REBILL BUTTON */}
+{isEdit && localEditData?.isInvoiced && (
+  <div className="d-flex align-items-center gap-2">
+    <div className="alert alert-danger text-center mb-0 p-1" style={{ fontSize: 12 }}>
+      🔒 Invoice Generated — Edit Disabled
+    </div>
+    <button
+      onClick={async () => {
+        const rebillCount = (localEditData.rebillHistory?.length || 0) + 1;
+        const confirmed = window.confirm(
+          `⚠️ Rebill Confirmation\n\nThis will:\n• Unlock the job sheet for editing\n• Clear current charges (Rebill #${rebillCount})\n• Set status back to "Received"\n• Save old invoice to rebill history\n\nProceed?`
+        );
+        if (!confirmed) return;
+        setRebilling(true);
+        try {
+          const user = JSON.parse(localStorage.getItem("user") || "{}");
+          const res = await axios.put(`${API}/api/jobsheets/${localEditData._id}/rebill`, {
+            rebilledBy: user?.username || "admin",
+          });
+          setLocalEditData(res.data);
+          setMobileStatus("Received");
+          setServiceCharge("");
+          setSpareCharge("");
+          setSpareItems([]);
+          setRemarks("");
+          alert(`✅ Rebill #${rebillCount} opened! Add new charges and generate invoice.`);
+        } catch (err) {
+          console.error(err);
+          alert("Rebill failed ❌");
+        } finally {
+          setRebilling(false);
+        }
+      }}
+      disabled={rebilling}
+      style={{
+        background: "#f59e0b", color: "#fff", border: "none",
+        fontWeight: 700, fontSize: 12, padding: "5px 12px",
+        borderRadius: 8, whiteSpace: "nowrap", cursor: "pointer",
+      }}
+    >
+      {rebilling ? "⏳..." : `🔄 Rebill${(localEditData.rebillHistory?.length || 0) > 0 ? ` #${(localEditData.rebillHistory.length || 0) + 1}` : ""}`}
+    </button>
+  </div>
+)}
 
           {/* REFRESH */}
           <button
@@ -1264,7 +1338,7 @@ const modelOptions = [
             Estimate
           </button>
 
-          {/* INVOICE + LOCK */}
+                {/* INVOICE + LOCK */}
           <button
             className="btn btn-danger btn-sm"
             onClick={async () => {
@@ -1278,15 +1352,26 @@ const modelOptions = [
                   `${API}/api/jobsheets/${localEditData._id}/invoice`
                 );
 
-                // ✅ UPDATE UI IMMEDIATELY
+                // ✅ Update localEditData with Delivered status
                 setLocalEditData(prev => ({
                   ...prev,
-                  isInvoiced: true
+                  isInvoiced: true,
+                  device: {
+                    ...prev.device,
+                    mobileStatus: "Delivered"
+                  }
                 }));
+                
+                // ✅ Update dropdown state
+                setMobileStatus("Delivered");
 
-                alert("Invoice Generated & Locked 🔒");
+                alert("Invoice Generated & Status Updated to Delivered 🔒");
 
-                window.open(`${window.location.origin}/invoice/${localEditData._id}`, "_blank");
+                // ✅ Refresh page after 1 second
+                setTimeout(() => {
+                  window.location.reload();
+                }, 1000);
+
               } catch (err) {
                 alert("Invoice failed ❌");
               }
@@ -1318,7 +1403,7 @@ const modelOptions = [
         />
       )}
 
-      {sparePopup && (
+   {sparePopup && (
         <SparePopup
           onClose={() => setSparePopup(false)}
           setSpareCharge={setSpareCharge}
@@ -1326,6 +1411,13 @@ const modelOptions = [
              existingItems={spareItems} 
         />
       )}
+
+      {/* ✅ REPAIR STEPS TIMELINE */}
+      {isEdit && editData?._id && (
+        <RepairStepsTimeline jobId={editData._id} />
+      )}
+
+   
 
       <div style={{ height: "80px" }} />
     </div>

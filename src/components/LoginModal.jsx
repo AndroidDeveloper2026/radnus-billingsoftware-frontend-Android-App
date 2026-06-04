@@ -6,30 +6,24 @@ const LoginModal = ({ show, onClose }) => {
 
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [error, setError]       = useState("");
+  const [loading, setLoading]   = useState(false);
   const API = import.meta.env.VITE_API_URL;
 
   if (!show) return null;
 
   const handleLogin = async () => {
-
-    // 🔹 validation
     if (!username || !password) {
       setError("Please enter username and password");
       return;
     }
-
     setError("");
     setLoading(true);
 
     try {
-
       const res = await fetch(`${API}/api/login`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username, password }),
       });
 
@@ -41,27 +35,25 @@ const LoginModal = ({ show, onClose }) => {
         return;
       }
 
-      // ✅ Save login data
       localStorage.setItem("token", data.token);
       localStorage.setItem("user", JSON.stringify(data.user));
 
-      // close modal
       onClose();
 
-      // redirect
-      navigate("/home");
+      // ✅ Engineer → /engineer/ajith (name lowercase)
+      if (data.user.role === "engineer") {
+        const engineerPath = (data.user.name || data.user.username).toLowerCase();
+        navigate(`/engineer/${engineerPath}`);
+      } else {
+        navigate("/home");
+      }
 
     } catch (err) {
-
       console.error("LOGIN ERROR:", err);
       setError("Server connection failed ❌");
-
     } finally {
-
       setLoading(false);
-
     }
-
   };
 
   return (
@@ -79,13 +71,11 @@ const LoginModal = ({ show, onClose }) => {
       >
         <div className="bg-white rounded-4 shadow-lg p-4">
 
-          {/* Header */}
           <div className="d-flex justify-content-between align-items-center mb-3">
             <h5 className="fw-bold mb-0">User Login</h5>
             <button className="btn-close" onClick={onClose}></button>
           </div>
 
-          {/* Username */}
           <div className="mb-3">
             <label className="form-label">Username</label>
             <input
@@ -96,7 +86,6 @@ const LoginModal = ({ show, onClose }) => {
             />
           </div>
 
-          {/* Password */}
           <div className="mb-3">
             <label className="form-label">Password</label>
             <input
@@ -108,14 +97,10 @@ const LoginModal = ({ show, onClose }) => {
             />
           </div>
 
-          {/* Error */}
           {error && (
-            <div className="alert alert-danger py-2 small">
-              {error}
-            </div>
+            <div className="alert alert-danger py-2 small">{error}</div>
           )}
 
-          {/* Login Button */}
           <button
             className="btn btn-primary w-100"
             onClick={handleLogin}
@@ -124,7 +109,6 @@ const LoginModal = ({ show, onClose }) => {
             {loading ? "Logging in..." : "Login"}
           </button>
 
-          {/* Cancel */}
           <button
             className="btn btn-outline-secondary w-100 mt-2"
             onClick={onClose}
