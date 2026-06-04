@@ -109,6 +109,9 @@ overflow: "hidden",
               <b>{paymentLabel} </b>
             </div>
 
+
+
+
             {/* CONTACT INFO */}
 
             <table style={{ fontSize: "13px" }}>
