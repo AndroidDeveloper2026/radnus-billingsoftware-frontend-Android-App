@@ -5,7 +5,7 @@ const SparePopup = ({ onClose, setSpareCharge, setSpareItems, existingItems = []
   const [name, setName] = useState("");
   const [qty, setQty] = useState(1);
   const [rate, setRate] = useState("");
- const [items, setItems] = useState(existingItems); 
+ const [items, setItems] = useState(existingItemms);
 
   const amount = Number(qty || 0) * Number(rate || 0);
 
