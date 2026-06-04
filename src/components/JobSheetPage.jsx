@@ -1341,48 +1341,47 @@ const getWorkloadBadge = (engName) => {
             Estimate
           </button>
 
-                {/* INVOICE + LOCK */}
-          <button
-            className="btn btn-danger btn-sm"
-            onClick={async () => {
-              if (!localEditData?._id) {
-                alert("Please save Job Sheet first");
-                return;
-              }
+        <button
+  className="btn btn-danger btn-sm"
+  onClick={async () => {
+    if (!localEditData?._id) {
+      alert("Please save Job Sheet first");
+      return;
+    }
 
-              try {
-                 window.open(`${window.location.origin}/invoice/${localEditData._id}`, "_blank");
-                await axios.put(
-                  `${API}/api/jobsheets/${localEditData._id}/invoice`
-                );
+    try {
+      // Open Invoice Page
+      window.open(
+        `${window.location.origin}/invoice/${localEditData._id}`,
+        "_blank"
+      );
 
-                // ✅ Update localEditData with Delivered status
-                setLocalEditData(prev => ({
-                  ...prev,
-                  isInvoiced: true,
-                  device: {
-                    ...prev.device,
-                    mobileStatus: "Delivered"
-                  }
-                }));
-                
-                // ✅ Update dropdown state
-                setMobileStatus("Delivered");
+      // Mark as Invoiced only
+      await axios.put(
+        `${API}/api/jobsheets/${localEditData._id}/invoice`
+      );
 
-                alert("Invoice Generated & Status Updated to Delivered 🔒");
+      // Lock Edit
+      setLocalEditData(prev => ({
+        ...prev,
+        isInvoiced: true
+      }));
 
-                // ✅ Refresh page after 1 second
-                setTimeout(() => {
-                  window.location.reload();
-                }, 1000);
+      alert("Invoice Generated Successfully 🔒");
 
-              } catch (err) {
-                alert("Invoice failed ❌");
-              }
-            }}
-          >
-            Invoice
-          </button>
+      // Refresh
+      setTimeout(() => {
+        window.location.reload();
+      }, 1000);
+
+    } catch (err) {
+      console.error(err);
+      alert("Invoice failed ❌");
+    }
+  }}
+>
+  Invoice
+</button>
 
           <button
             className="btn btn-secondary btn-sm"
