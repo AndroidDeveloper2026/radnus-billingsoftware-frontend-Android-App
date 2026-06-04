@@ -407,7 +407,7 @@ const handleUpdate = async () => {
     // ✅ NEW: reset validation state too
     setTouched({});
     setFormErrors({});
-    setShowErrorBanner(false);
+   
 
     const today = new Date().toISOString().split("T")[0];
     setRepairDate(today);
