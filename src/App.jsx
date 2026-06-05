@@ -5,7 +5,7 @@ import JobSheetPage from "./components/JobSheetPage";
 import JobSheetEditWrapper from "./components/JobSheetEditWrapper";
 import Home from "./components/Home";
 import EstimateBill from "./components/EstimateBill";
-import RepairedReport from "./components/reports/RepairedReport";
+import RepairedReport from "./components/reports/Repairedreport";
 
 import DailyPendingReport from "./components/reports/DailyPendingReport";
 import ReportPage from "./components/reports/MainReportPage";
