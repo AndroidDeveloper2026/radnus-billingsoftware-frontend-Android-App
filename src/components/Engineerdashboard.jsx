@@ -8,10 +8,10 @@ const STATUS_STEPS = [
   { key: "Received",   label: "📥 Received",   color: "#3b82f6", bg: "#dbeafe" },
   { key: "Diagnosing", label: "🔍 Diagnosing",  color: "#f59e0b", bg: "#fef3c7" },
   { key: "Repairing",  label: "🔧 Repairing",   color: "#8b5cf6", bg: "#ede9fe" },
-  // ✅ ADD THIS:
   { key: "Repaired",   label: "✅ Repaired",    color: "#10b981", bg: "#d1fae5" },
-  { key: "Ready",      label: "🎉 Ready",       color: "#059669", bg: "#a7f3d0" },
-  { key: "Delivered",  label: "🎉 Delivered",   color: "#059669", bg: "#a7f3d0" },
+  { key: "Delivered NR/NA",      label: "🎉 Delivered NR/NA",       color: "#059669", bg: "#a7f3d0" },
+  { key: "Return",     label: "↩️ Return",      color: "#ef4444", bg: "#fee2e2" }, // ✅ NEW
+  { key: "Delivered",  label: "🚀 Delivered",   color: "#059669", bg: "#a7f3d0" },
 ];
 const getStaleDays = (job) => {
   const dates = [new Date(job.createdAt)];
@@ -186,7 +186,7 @@ const EngineerDashboard = () => {
 
 // ✅ FIX — .length சேர்க்கணும்
 const myLoad = jobs.filter(j =>
-  !["Delivered", "Delivered NR/NA", "Repaired", "Ready"].includes(j.device?.mobileStatus) && !j.isInvoiced
+  !["Delivered", "Delivered NR/NA", "Repaired", "Ready", "Delivered NR/NA"].includes(j.device?.mobileStatus) && !j.isInvoiced
 ).length;
   const getTransferBadge = (name) => {
     const count = workloadMap[name] || 0;
