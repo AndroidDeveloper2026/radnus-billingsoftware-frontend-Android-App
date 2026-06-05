@@ -184,10 +184,10 @@ const EngineerDashboard = () => {
     .map(e => e.name || e)
     .filter(n => n.toLowerCase() !== engineerName.toLowerCase());
 
-  const myLoad = jobs.filter(j =>
-    !["Delivered", "Delivered NR/NA"].includes(j.device?.mobileStatus) && !j.isInvoiced
-  ).length;
-
+// ✅ FIX — .length சேர்க்கணும்
+const myLoad = jobs.filter(j =>
+  !["Delivered", "Delivered NR/NA", "Repaired", "Ready"].includes(j.device?.mobileStatus) && !j.isInvoiced
+).length;
   const getTransferBadge = (name) => {
     const count = workloadMap[name] || 0;
     const free  = MAX_JOBS - count;
