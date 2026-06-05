@@ -18,7 +18,7 @@ const DailyRepairedReport = () => {
 
       // FILTER ONLY REPAIRED (UNCHANGED)
       data = data.filter(
-        item => item.device?.mobileStatus === "Pending"
+        item => item.device?.mobileStatus === "Repaired"
       );
 
       // GROUP BY DATE (UNCHANGED)

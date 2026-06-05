@@ -5,6 +5,9 @@ import JobSheetPage from "./components/JobSheetPage";
 import JobSheetEditWrapper from "./components/JobSheetEditWrapper";
 import Home from "./components/Home";
 import EstimateBill from "./components/EstimateBill";
+import RepairedReport from "./components/reports/RepairedReport";
+
+import DailyPendingReport from "./components/reports/DailyPendingReport";
 import ReportPage from "./components/reports/MainReportPage";
 import RepairPendingReport from "./components/reports/RepairPendingReport";
 import DeliveryPendingReport from "./components/reports/DeliveryPendingReport";
@@ -42,8 +45,18 @@ function App() {
         <Route path="/estimate-bill/:id" element={<EstimateBill />} />
         <Route path="/invoice/:id" element={<InvoiceBill />} />
         <Route path="/report" element={<ReportPage />} />
-        <Route path="/repair-pending" element={<RepairPendingReport />} />
-        <Route path="/delivery-pending" element={<DeliveryPendingReport />} />
+               <Route path="/pending-report"  element={<RepairPendingReport />} />
+        <Route path="/repaired-report" element={<RepairedReport />} />
+        <Route path="/delivered-report" element={<DeliveryPendingReport />} />
+
+
+
+
+
+
+        
+      <Route path="/pending-report" element={<DailyPendingReport />} />
+
         <Route path="/value-report" element={<ValueReport />} />
         <Route path="/engineer-report" element={<EngineerValueReport />} />
         <Route path="/received-report" element={<DailyReceivedReport />} />

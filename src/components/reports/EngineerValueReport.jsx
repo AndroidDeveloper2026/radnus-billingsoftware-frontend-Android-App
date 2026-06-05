@@ -179,6 +179,7 @@ const EngineerValueReport = () => {
               <tr className="text-gray-700">
                 <th className="p-3 border">Job No</th>
                 <th className="p-3 border">Name</th>
+                 <th className="p-3 border">Engineer</th>  
                 <th className="p-3 border">Received</th>
                 <th className="p-3 border">Repaired</th>
                 <th className="p-3 border">Delivered</th>
@@ -240,6 +241,9 @@ const EngineerValueReport = () => {
                           >
                             <td className="p-2 border">{item.jobSheetNo}</td>
                             <td className="p-2 border">{item.customer?.name || "-"}</td>
+                            <td className="p-2 border font-medium text-blue-700">
+  {item.service?.engineer || "-"}  {/* ✅ Engineer name */}
+</td>
 
                             <td className="p-2 border">
                               {item.createdAt
@@ -270,7 +274,7 @@ const EngineerValueReport = () => {
 
                       {/* SUB TOTAL */}
                       <tr className="font-semibold bg-gray-100">
-                        <td colSpan="5" className="p-2 border text-right">
+                        <td colSpan="6" className="p-2 border text-right">
                           Sub Total
                         </td>
                         <td className="p-2 border text-right">
@@ -290,7 +294,7 @@ const EngineerValueReport = () => {
 
               {/* GRAND TOTAL */}
               <tr className="font-bold bg-green-100">
-                <td colSpan="5" className="p-2 border text-right">
+                <td colSpan="6" className="p-2 border text-right">
                   Grand Total
                 </td>
                 <td className="p-2 border text-right">

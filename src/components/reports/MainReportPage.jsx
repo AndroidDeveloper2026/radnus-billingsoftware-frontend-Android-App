@@ -11,8 +11,7 @@ const ReportPage = () => {
   const [engineers, setEngineers] = useState([]);
   const [engineer, setEngineer]   = useState("");
   const [dealer, setDealer]       = useState("");
-  const [counts, setCounts] = useState({ received: 0, repaired: 0, delivered: 0, nrna: 0 });
-
+  const [counts, setCounts] = useState({ received: 0, pending: 0, repaired: 0, delivered: 0, nrna: 0 });
   const [staleJobs, setStaleJobs]       = useState([]);
   const [staleDays, setStaleDays]       = useState(3);
   const [staleLoading, setStaleLoading] = useState(false);
@@ -22,12 +21,13 @@ const ReportPage = () => {
     try {
       const res = await axios.get(`${API}/api/jobsheets/filter`, { params: { fromDate, toDate, engineer, dealer } });
       const data = res.data;
-      setCounts({
-        received:  data.filter(d => d.device?.mobileStatus === "Received").length,
-        repaired:  data.filter(d => d.device?.mobileStatus === "Pending").length,
-        delivered: data.filter(d => d.device?.mobileStatus === "Delivered").length,
-        nrna:      data.filter(d => d.device?.mobileStatus === "Delivered NR/NA").length,
-      });
+    setCounts({
+  received:  data.filter(d => d.device?.mobileStatus === "Received").length,
+  pending:   data.filter(d => d.device?.mobileStatus === "Pending").length,   // NEW
+  repaired:  data.filter(d => d.device?.mobileStatus === "Repaired").length,  // FIXED
+  delivered: data.filter(d => d.device?.mobileStatus === "Delivered").length,
+  nrna:      data.filter(d => d.device?.mobileStatus === "Delivered NR/NA").length,
+});
     } catch { alert("Failed ❌"); }
   };
 
@@ -102,11 +102,12 @@ const ReportPage = () => {
         </div>
 
         {/* COUNT CARDS */}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: "14px", marginBottom: "20px" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(5,1fr)", gap: "14px", marginBottom: "20px" }}>
           {[
             { label: "Received",  value: counts.received,  color: "#3b82f6", bg: "#eff6ff", icon: "📥" },
-            { label: "Repairing", value: counts.repaired,  color: "#f59e0b", bg: "#fffbeb", icon: "🔧" },
+           { label: "Pending",   value: counts.pending,   color: "#f59e0b", bg: "#fffbeb",  icon: "🔧" },
             { label: "Delivered", value: counts.delivered, color: "#10b981", bg: "#f0fdf4", icon: "✅" },
+            { label: "Repaired",  value: counts.repaired,  color: "#10b981", bg: "#f0fdf4",  icon: "✅" },
             { label: "NR / NA",   value: counts.nrna,      color: "#ef4444", bg: "#fef2f2", icon: "❌" },
           ].map((c, i) => (
             <div key={i} style={{ background: c.bg, borderRadius: "12px", padding: "16px 18px", border: `1.5px solid ${c.color}22`, boxShadow: "0 1px 4px rgba(0,0,0,0.05)" }}>
@@ -117,7 +118,65 @@ const ReportPage = () => {
           ))}
         </div>
 
-        {/* ── STALE JOBS — LIGHT UI ── */}
+       
+
+        {/* REPORT SECTIONS */}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
+
+          {/* Status Reports */}
+          <div style={{ background: "#fff", borderRadius: "14px", padding: "20px", boxShadow: "0 1px 4px rgba(0,0,0,0.06)" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "14px" }}>
+              <span style={{ fontSize: "18px" }}>📋</span>
+              <span style={{ fontWeight: 800, color: "#0f172a", fontSize: "15px" }}>Status Reports</span>
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
+            {[
+  { label: "Pending",          path: "/pending-report" },
+  { label: "Repaired",         path: "/repaired-report" },
+  { label: "Delivered",        path: "/delivered-report" },
+  
+  { label: "Value Report",     path: "/value-report" },
+  { label: "Engineer Report",  path: "/engineer-report" },
+  { label: "Spare Report",     path: "/spare-report" },
+  { label: "Dealer Report",    path: "/dealer-report" },
+  { label: "Rebill Report",    path: "/rebill-report" },
+].map((b, i) => (
+  <button key={i} onClick={() => navigate(b.path)} className="rpt-btn">{b.label}</button>
+))}
+            </div>
+          </div>
+
+          {/* Daily Summary */}
+          <div style={{ background: "#fff", borderRadius: "14px", padding: "20px", boxShadow: "0 1px 4px rgba(0,0,0,0.06)" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "14px" }}>
+              <span style={{ fontSize: "18px" }}>📅</span>
+              <span style={{ fontWeight: 800, color: "#0f172a", fontSize: "15px" }}>Daily Summary</span>
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
+              {[
+                { label: "Received",        path: "/received-report" },
+                  { label: "Pending",         path: "/pending-report" },
+
+                { label: "Repaired",        path: "/repaired-report" },
+                { label: "Delivered",       path: "/delivered-report" },
+                { label: "Delivered NR/NA", path: "/delivered-nrna-report" },
+
+              ].map((b, i) => (
+                <button key={i} onClick={() => navigate(b.path)} className="rpt-btn">{b.label}</button>
+              ))}
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", marginTop: "8px" }}>
+              {[
+                { label: "All Report",          path: "/all-report" },
+                { label: "All Engineer Report", path: "/engineer-all-report" },
+              ].map((b, i) => (
+                <button key={i} onClick={() => navigate(b.path)} className="rpt-btn-accent">{b.label}</button>
+              ))}
+            </div>
+          </div>
+
+        </div>
+         {/* ── STALE JOBS — LIGHT UI ── */}
         <div style={{ background: "#fff", borderRadius: "14px", marginBottom: "20px", boxShadow: "0 1px 6px rgba(0,0,0,0.07)", overflow: "hidden", border: "1.5px solid #fcd34d" }}>
 
           {/* Panel Header */}
@@ -207,58 +266,6 @@ const ReportPage = () => {
               )}
             </div>
           )}
-        </div>
-
-        {/* REPORT SECTIONS */}
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
-
-          {/* Status Reports */}
-          <div style={{ background: "#fff", borderRadius: "14px", padding: "20px", boxShadow: "0 1px 4px rgba(0,0,0,0.06)" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "14px" }}>
-              <span style={{ fontSize: "18px" }}>📋</span>
-              <span style={{ fontWeight: 800, color: "#0f172a", fontSize: "15px" }}>Status Reports</span>
-            </div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
-              {[
-                { label: "Repair Pending",   path: "/repair-pending" },
-                { label: "Delivery Pending", path: "/delivery-pending" },
-                { label: "Value Report",     path: "/value-report" },
-                { label: "Engineer Report",  path: "/engineer-report" },
-                { label: "Spare Report",     path: "/spare-report" },
-                { label: "Dealer Report",    path: "/dealer-report" },
-                  { label: "Rebill Report",    path: "/rebill-report" }, // New
-              ].map((b, i) => (
-                <button key={i} onClick={() => navigate(b.path)} className="rpt-btn">{b.label}</button>
-              ))}
-            </div>
-          </div>
-
-          {/* Daily Summary */}
-          <div style={{ background: "#fff", borderRadius: "14px", padding: "20px", boxShadow: "0 1px 4px rgba(0,0,0,0.06)" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "14px" }}>
-              <span style={{ fontSize: "18px" }}>📅</span>
-              <span style={{ fontWeight: 800, color: "#0f172a", fontSize: "15px" }}>Daily Summary</span>
-            </div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
-              {[
-                { label: "Received",        path: "/received-report" },
-                { label: "Repaired",        path: "/repaired-report" },
-                { label: "Delivered",       path: "/delivered-report" },
-                { label: "Delivered NR/NA", path: "/delivered-nrna-report" },
-              ].map((b, i) => (
-                <button key={i} onClick={() => navigate(b.path)} className="rpt-btn">{b.label}</button>
-              ))}
-            </div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", marginTop: "8px" }}>
-              {[
-                { label: "All Report",          path: "/all-report" },
-                { label: "All Engineer Report", path: "/engineer-all-report" },
-              ].map((b, i) => (
-                <button key={i} onClick={() => navigate(b.path)} className="rpt-btn-accent">{b.label}</button>
-              ))}
-            </div>
-          </div>
-
         </div>
       </div>
     </div>
