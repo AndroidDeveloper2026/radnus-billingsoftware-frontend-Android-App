@@ -347,7 +347,7 @@ const handleUpdate = async () => {
       formData.append("spareItems", JSON.stringify(spareItems));
       formData.append("idProofType", idProofType);
       if (idProofImage) formData.append("idProofImage", idProofImage);
-      if (user) formData.append("createdBy", user.username);
+      if (user) formData.append("createdBy", JSON.stringify({ username: user.username, role: user.role }));
 
       const res = await axios.post(`${API}/api/jobsheets`, formData, {
         headers: { "Content-Type": "multipart/form-data" }
