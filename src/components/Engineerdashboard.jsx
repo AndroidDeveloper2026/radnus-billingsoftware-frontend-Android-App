@@ -142,28 +142,42 @@ const EngineerDashboard = () => {
     } catch { alert("Delete failed ❌"); }
   };
 
-  const handleTransfer = async () => {
-    if (!transferTo) return alert("Engineer select பண்ணுங்க!");
-    if (transferTo === engineerName) return alert("உங்களுக்கே transfer பண்ண முடியாது!");
+const handleTransfer = async () => {
+  if (!transferTo) return alert("Please Select the Engineer !");
+  if (transferTo === engineerName) return alert("You can't transfer it to yourself!");
 
-    // ✅ Frontend workload check for transfer
+  // ✅ No workload check for Reception
+  if (transferTo !== "Reception") {
     const targetLoad = workloadMap[transferTo] || 0;
     if (targetLoad >= MAX_JOBS) {
-      return alert(`⚠️ ${transferTo} is at full capacity (${MAX_JOBS} jobs)!\nPlease choose another engineer.`);
+      return alert(`⚠️ ${transferTo} is at full capacity!`);
     }
+  }
 
-    setTransferLoading(true);
-    try {
-      await axios.patch(`${API}/api/jobsheets/${transferJobId}/transfer`, { from: engineerName, to: transferTo, note: transferNote });
-      setJobs(prev => prev.filter(j => j._id !== transferJobId));
-      fetchWorkload();
-      setTransferJobId(null); setTransferTo(""); setTransferNote("");
-      alert(`✅ Job transferred to ${transferTo}`);
-    } catch (err) {
-      const msg = err.response?.data?.message || "Transfer failed ❌";
-      alert(msg);
-    } finally { setTransferLoading(false); }
-  };
+  setTransferLoading(true);
+  try {
+    await axios.patch(`${API}/api/jobsheets/${transferJobId}/transfer`, {
+      from: engineerName,
+      to: transferTo,
+      note: transferNote
+    });
+    setJobs(prev => prev.filter(j => j._id !== transferJobId));
+    fetchWorkload();
+    setTransferJobId(null);
+    setTransferTo("");
+    setTransferNote("");
+
+    alert(
+      transferTo === "Reception"
+        ? `✅ Job returned to Reception!`
+        : `✅ Job transferred to ${transferTo}`
+    );
+  } catch (err) {
+    alert(err.response?.data?.message || "Transfer failed ❌");
+  } finally {
+    setTransferLoading(false);
+  }
+};
 
   const filtered = jobs.filter(j => {
     const q = search.toLowerCase();
@@ -210,15 +224,18 @@ const myLoad = jobs.filter(j =>
             </div>
 
             <label style={{ fontSize: "12px", color: "#64748b", fontWeight: 600 }}>Transfer to:</label>
-            <select value={transferTo} onChange={e => setTransferTo(e.target.value)}
-              style={{ width: "100%", border: "1px solid #cbd5e1", borderRadius: "8px", padding: "8px 10px", fontSize: "13px", marginTop: "4px", marginBottom: "12px", outline: "none" }}>
-              <option value="">-- Select Engineer --</option>
-              {otherEngineers.map((eng, i) => {
-                const b = getTransferBadge(eng);
-                return <option key={i} value={eng} disabled={b.disabled}>{b.label}</option>;
-              })}
-            </select>
-
+          <select value={transferTo} onChange={e => setTransferTo(e.target.value)}
+  style={{ width: "100%", border: "1px solid #cbd5e1", borderRadius: "8px", padding: "8px 10px", fontSize: "13px", marginTop: "4px", marginBottom: "12px" }}>
+  <option value="">-- Select Target --</option>
+  {/* ✅ Reception option */}
+  <option value="Reception">🏠 Reception (Free up capacity)</option>
+  <optgroup label="Engineers">
+    {otherEngineers.map((eng, i) => {
+      const b = getTransferBadge(eng);
+      return <option key={i} value={eng} disabled={b.disabled}>{b.label}</option>;
+    })}
+  </optgroup>
+</select>
             {/* Workload hint for selected target */}
             {transferTo && (() => {
               const count = workloadMap[transferTo] || 0;
