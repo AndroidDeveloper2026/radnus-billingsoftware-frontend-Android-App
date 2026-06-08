@@ -5,6 +5,7 @@ import JobSheetSearchModal from "./JobSheetSearchModal";
 import SparePopup from "./SparePopup";
 import Select from "react-select";
 import RepairStepsTimeline from "./RepairStepsTimeline";
+import CustomerAutocomplete from "./CustomerAutocomplete";
 import { useNavigate } from "react-router-dom";
 const isValidEmail = (email) =>
   /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
@@ -30,20 +31,27 @@ const [customFaults, setCustomFaults] = useState([]);
   const [formErrors, setFormErrors] = useState({});
  
 
-  const validateField = (name, value) => {
-    switch (name) {
-      case "customerName":
-        return !value?.trim() ? "Customer Name is required" : "";
-      case "contact":
-        return !value ? "Contact No is required"
-          : !/^\d{10}$/.test(value) ? "Must be exactly 10 digits" : "";
-      case "email":
-        return value && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)
-          ? "Invalid email format" : "";
-      default:
-        return "";
-    }
-  };
+  // ✅ FIX 1: Null/undefined/empty string check strict-ஆ பண்ணு
+const validateField = (name, value) => {
+  switch (name) {
+    case "customerName":
+      return !value || !value?.toString().trim() ? "Customer Name is required" : "";
+    
+    case "contact":
+      // Strict empty check + 10 digit check
+      const contactVal = value?.toString().trim();
+      if (!contactVal || contactVal === "") return "Contact No is required";
+      if (!/^\d{10}$/.test(contactVal)) return "Must be exactly 10 digits";
+      return "";
+    
+    case "email":
+      if (!value || value.toString().trim() === "") return "";
+      return !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value) ? "Invalid email format" : "";
+    
+    default:
+      return "";
+  }
+};
 
   const handleBlur = (name, value) => {
     setTouched(prev => ({ ...prev, [name]: true }));
@@ -157,9 +165,6 @@ const [customFaults, setCustomFaults] = useState([]);
         : [...state, value]
     );
   };
-
-
-
 
 /* ── WORKLOAD MAP: { "Barani": 4, "Ajith": 5 } ── */
   const [workloadMap, setWorkloadMap] = useState({});
@@ -734,7 +739,7 @@ const getWorkloadBadge = (engName) => {
             <div className="card-body row g-2">
 
               {/* ── Customer Name (VALIDATION ADDED) ── */}
-              <div className="col-md-4">
+              {/* <div className="col-md-4">
                 <input
                   className={`form-control form-control-sm ${
                     touched.customerName && formErrors.customerName ? "is-invalid" :
@@ -755,10 +760,40 @@ const getWorkloadBadge = (engName) => {
                 {touched.customerName && !formErrors.customerName && customerName && (
                   <div style={{ fontSize: 11, color: "#198754" }}>✅ Looks good!</div>
                 )}
-              </div>
+              </div> */}
+
+              {/* ── Customer Name (WITH AUTOCOMPLETE) ── */}
+<div className="col-md-4">
+ <CustomerAutocomplete
+  type="name"
+  value={customerName}
+  onChange={setCustomerName}
+  onSelect={(customer) => {
+    setCustomerName(customer.name || "");
+    setContact(customer.contact || "");
+    setAltContact(customer.altContact || "");
+    setAddress(customer.address || "");
+    setEmail(customer.email || "");
+  }}
+  placeholder="Customer Name *"
+  className={`form-control form-control-sm ${
+    touched.customerName && formErrors.customerName ? "is-invalid" :
+    touched.customerName && !formErrors.customerName ? "is-valid" : ""
+  }`}
+ inputProps={{
+  onBlur: () => handleBlur("customerName", customerName)
+}}
+  />
+  {touched.customerName && formErrors.customerName && (
+    <div className="invalid-feedback d-block" style={{ fontSize: 11 }}>⚠️ {formErrors.customerName}</div>
+  )}
+  {touched.customerName && !formErrors.customerName && customerName && (
+    <div style={{ fontSize: 11, color: "#198754" }}>✅ Looks good!</div>
+  )}
+</div>
 
               {/* ── Contact No (VALIDATION ADDED) ── */}
-              <div className="col-md-4">
+              {/* <div className="col-md-4">
                 <input
                   className={`form-control form-control-sm ${
                     touched.contact && formErrors.contact ? "is-invalid" :
@@ -781,7 +816,40 @@ const getWorkloadBadge = (engName) => {
                 {touched.contact && !formErrors.contact && contact && (
                   <div style={{ fontSize: 11, color: "#198754" }}>✅ Valid number</div>
                 )}
-              </div>
+              </div> */}
+
+              {/* ── Contact No (WITH AUTOCOMPLETE) ── */}
+<div className="col-md-4">
+  <CustomerAutocomplete
+    type="contact"
+    value={contact}
+    onChange={setContact}
+    filterNumbers={true}
+    onSelect={(customer) => {
+      setCustomerName(customer.name || "");
+      setContact(customer.contact || "");
+      setAltContact(customer.altContact || "");
+      setAddress(customer.address || "");
+      setEmail(customer.email || "");
+    }}
+    placeholder="Contact No *"
+    maxLength={10}
+    className={`form-control form-control-sm ${
+      touched.contact && formErrors.contact ? "is-invalid" :
+      touched.contact && !formErrors.contact && contact ? "is-valid" : ""
+    }`}
+    // ✅ KEY FIX: onBlur-ல current state value (contact) pass பண்ணு, not e.target.value
+    inputProps={{
+  onBlur: () => handleBlur("contact", contact)
+}}
+  />
+  {touched.contact && formErrors.contact && (
+    <div className="invalid-feedback d-block" style={{ fontSize: 11 }}>⚠️ {formErrors.contact}</div>
+  )}
+  {touched.contact && !formErrors.contact && contact && (
+    <div style={{ fontSize: 11, color: "#198754" }}>✅ Valid number</div>
+  )}
+</div>
 
               <div className="col-md-4">
                 <input
@@ -827,6 +895,46 @@ const getWorkloadBadge = (engName) => {
                 {touched.email && !formErrors.email && email && (
                   <div style={{ fontSize: 11, color: "#198754" }}>✅ Valid email</div>
                 )}
+              </div>
+
+               {/* ID PROOF TYPE */}
+              <div className="col-md-4">
+                <select
+                  className="form-select form-select-sm"
+                  value={idProofType}
+                  onChange={(e) => setIdProofType(e.target.value)}
+                >
+                  <option value="">Select ID Proof</option>
+                  <option value="Aadhaar Card">Aadhaar Card</option>
+                  <option value="Passport">Passport</option>
+                  <option value="Driving License">Driving License</option>
+                  <option value="Election ID">Election ID</option>
+                  <option value="ID Not Required">ID Not Required</option>
+                  <option value="Dealer Collected">Dealer Collected</option>
+                </select>
+              </div>
+
+              {/* IMAGE UPLOAD */}
+              <div className="col-md-4">
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="form-control form-control-sm"
+                  onChange={(e) => {
+                    const file = e.target.files[0];
+                    setIdProofImage(file);
+
+                    if (file) {
+                      setIdProofPreview(URL.createObjectURL(file));
+                    }
+                  }}
+                  disabled={
+                    idProofType === "ID Not Required" ||
+                    idProofType === "Dealer Collected"
+                  }
+                />
+
+
               </div>
 
             </div>
@@ -938,45 +1046,7 @@ const getWorkloadBadge = (engName) => {
               </div>
 
               {/* Row 3 – ID Type & ID Number */}
-              {/* ID PROOF TYPE */}
-              <div className="col-md-4">
-                <select
-                  className="form-select form-select-sm"
-                  value={idProofType}
-                  onChange={(e) => setIdProofType(e.target.value)}
-                >
-                  <option value="">Select ID Proof</option>
-                  <option value="Aadhaar Card">Aadhaar Card</option>
-                  <option value="Passport">Passport</option>
-                  <option value="Driving License">Driving License</option>
-                  <option value="Election ID">Election ID</option>
-                  <option value="ID Not Required">ID Not Required</option>
-                  <option value="Dealer Collected">Dealer Collected</option>
-                </select>
-              </div>
-
-              {/* IMAGE UPLOAD */}
-              <div className="col-md-4">
-                <input
-                  type="file"
-                  accept="image/*"
-                  className="form-control form-control-sm"
-                  onChange={(e) => {
-                    const file = e.target.files[0];
-                    setIdProofImage(file);
-
-                    if (file) {
-                      setIdProofPreview(URL.createObjectURL(file));
-                    }
-                  }}
-                  disabled={
-                    idProofType === "ID Not Required" ||
-                    idProofType === "Dealer Collected"
-                  }
-                />
-
-
-              </div>
+             
               {/* {idProofPreview && (
   <img
     src={idProofPreview}

@@ -1,8 +1,10 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
 import * as XLSX from "xlsx";
+import { useNavigate } from "react-router-dom";
 
 const AllReportPage = () => {
+    const navigate = useNavigate(); 
   const [filteredData, setFilteredData] = useState([]);
   const [loading, setLoading] = useState(false);
 
@@ -252,9 +254,11 @@ const AllReportPage = () => {
                   const rowBg = index % 2 === 0 ? "#fff" : "#f8fafc";
                   const td    = { padding: "8px 8px", borderBottom: "1px solid #e2e8f0", borderRight: "1px solid #e2e8f0", whiteSpace: "nowrap", color: "#1e293b" };
                   return (
-                    <tr key={index} style={{ background: rowBg }}
-                      onMouseEnter={e => e.currentTarget.style.background = "#eff6ff"}
-                      onMouseLeave={e => e.currentTarget.style.background = rowBg}>
+                    <tr key={index} 
+  style={{ background: rowBg, cursor: "pointer" }}
+  onDoubleClick={() => navigate(`/jobsheet/${item._id}`)}
+  onMouseEnter={e => e.currentTarget.style.background = "#eff6ff"}
+  onMouseLeave={e => e.currentTarget.style.background = rowBg}>
 
                       {/* 1. SL */}
                       <td style={{ ...td, color: "#64748b" }}>{index + 1}</td>
