@@ -90,8 +90,12 @@ const AllReportPage = () => {
       "Problems":           item.visualIssues?.join(", ") || "-",
       "Physical Condition": item.physicalCondition?.join(", ") || "-",
       "Accessories":        item.accessories?.join(", ") || "-",
-      "Remarks":            item.service?.remarks || "-",
-      "Created By":         item.createdBy?.username || "-",
+     "Advance Amount":     item.service?.advanceAmount || 0,
+"Margin":             item.service?.margin || 0,
+"Remarks":            item.service?.remarks || "-",
+      "Cancel Remarks": item.cancelRemarks || "-",
+"Cancelled By":   item.cancelledBy   || "-",
+    "Created By": item.createdBy?.name || item.createdBy?.username || "-",
     }));
 
     const ws = XLSX.utils.json_to_sheet(rows);
@@ -101,9 +105,8 @@ const AllReportPage = () => {
       { wch: 17 }, { wch: 12 }, { wch: 16 }, { wch: 14 }, { wch: 16 },
       { wch: 12 }, { wch: 14 }, { wch: 12 }, { wch: 10 }, { wch: 13 },
       { wch: 14 }, { wch: 13 }, { wch: 14 }, { wch: 28 }, { wch: 28 },
-      { wch: 22 }, { wch: 22 }, { wch: 14 },
+  { wch: 22 }, { wch: 22 }, { wch: 13 }, { wch: 12 }, { wch: 14 },
     ];
-
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "All Reports");
     XLSX.writeFile(wb, `All_Report_${fromDate || "all"}_to_${toDate || "all"}.xlsx`);
@@ -114,8 +117,8 @@ const AllReportPage = () => {
     if (s === "Pending")         return { background: "#fef3c7", color: "#92400e", padding: "2px 8px", borderRadius: "12px", fontSize: "11px", fontWeight: 600, whiteSpace: "nowrap" };
     if (s === "Received")        return { background: "#dbeafe", color: "#1e40af", padding: "2px 8px", borderRadius: "12px", fontSize: "11px", fontWeight: 600, whiteSpace: "nowrap" };
     if (s === "Delivered NR/NA") return { background: "#fee2e2", color: "#991b1b", padding: "2px 8px", borderRadius: "12px", fontSize: "11px", fontWeight: 600, whiteSpace: "nowrap" };
-    return { background: "#f3f4f6", color: "#374151", padding: "2px 8px", borderRadius: "12px", fontSize: "11px", fontWeight: 600 };
-  };
+   if (s === "Cancelled") return { background: "#fee2e2", color: "#991b1b", padding: "2px 8px", borderRadius: "12px", fontSize: "11px", fontWeight: 600, whiteSpace: "nowrap" };
+    return { background: "#f3f4f6", color: "#374151", padding: "2px 8px", borderRadius: "12px", fontSize: "11px", fontWeight: 600 };}
 
   const totalService = filteredData.reduce((s, i) => s + Number(i.service?.serviceCharge || 0), 0);
   const totalSpare   = filteredData.reduce((s, i) => s + Number(i.service?.spareCharge || 0), 0);
@@ -128,7 +131,7 @@ const AllReportPage = () => {
     "Engineer", "Dealer", "Drawer",
     "Svc ₹", "Spare ₹", "Total ₹", "Payment",
     "Problems", "Physical Cond.", "Accessories",
-    "Repair Date", "Delivery Date", "Remarks", "Created By"
+    "Repair Date", "Delivery Date", "Advance ₹", "Margin ₹", "Remarks", "Created By"
   ];
   // headers.length = 25
   // Svc ₹ is index 14 (0-based), so colSpan for footer label = 14
@@ -162,6 +165,7 @@ const AllReportPage = () => {
               <option value="Pending">Pending</option>
               <option value="Delivered">Delivered</option>
               <option value="Delivered NR/NA">Delivered NR/NA</option>
+              <option value="Cancelled">Cancelled</option>
             </select>
           </div>
 
@@ -282,8 +286,18 @@ const AllReportPage = () => {
                       <td style={td}>{item.device?.imei || "-"}</td>
                       {/* 10. Warranty */}
                       <td style={td}>{item.device?.warranty || "-"}</td>
-                      {/* 11. Status */}
-                      <td style={td}><span style={getStatusStyle(item.device?.mobileStatus)}>{item.device?.mobileStatus || "-"}</span></td>
+{/* 11. Status */}
+<td style={td}>
+  <span style={getStatusStyle(item.device?.mobileStatus)}>
+    {item.device?.mobileStatus || "-"}
+  </span>
+  {item.isCancelled && item.cancelRemarks && (
+    <div style={{ fontSize: 10, color: "#dc3545", marginTop: 3, whiteSpace: "normal", maxWidth: 120 }}>
+      📝 {item.cancelRemarks}
+    </div>
+  )}
+</td>
+                      
                       {/* 12. Engineer */}
                       <td style={td}>{item.service?.engineer || "-"}</td>
                       {/* 13. Dealer */}
@@ -307,11 +321,26 @@ const AllReportPage = () => {
                       {/* 22. Repair Date */}
                       <td style={td}>{item.service?.repairDate ? new Date(item.service.repairDate).toLocaleDateString("en-IN") : "-"}</td>
                       {/* 23. Delivery Date */}
+                      
+                      
+                      
                       <td style={td}>{item.service?.deliveryDate ? new Date(item.service.deliveryDate).toLocaleDateString("en-IN") : "-"}</td>
+
+                      {/* 24. Advance */}
+<td style={{ ...td, color: "#0369a1", fontWeight: 600 }}>
+  {item.service?.advanceAmount ? `₹${Number(item.service.advanceAmount).toLocaleString("en-IN")}` : "-"}
+</td>
+{/* 25. Margin */}
+<td style={{ ...td, color: "#059669", fontWeight: 600 }}>
+  {item.service?.margin ? `₹${Number(item.service.margin).toLocaleString("en-IN")}` : "-"}
+</td>
                       {/* 24. Remarks */}
+
+
                       <td style={{ ...td, maxWidth: "140px", whiteSpace: "normal", wordBreak: "break-word" }}>{item.service?.remarks || "-"}</td>
                       {/* 25. Created By */}
-                      <td style={td}>{item.createdBy?.username || "-"}</td>
+                 {/* 25. Created By */}
+<td style={td}>{item.createdBy?.name || item.createdBy?.username || "-"}</td>
                     </tr>
                   );
                 })
@@ -331,7 +360,7 @@ const AllReportPage = () => {
                   <td style={{ padding: "10px 8px", color: "#c4b5fd" }}>₹{totalService.toLocaleString("en-IN")}</td>
                   <td style={{ padding: "10px 8px", color: "#f9a8d4" }}>₹{totalSpare.toLocaleString("en-IN")}</td>
                   <td style={{ padding: "10px 8px", color: "#6ee7b7" }}>₹{totalAmount.toLocaleString("en-IN")}</td>
-                  <td colSpan="8"></td>
+                  <td colSpan="10"></td>
                 </tr>
               </tfoot>
             )}

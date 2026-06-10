@@ -25,7 +25,9 @@ const JobSheetPage = ({ editData = null, isEdit = false }) => {
   const pendingNextNo = React.useRef(null);
   const API = import.meta.env.VITE_API_URL;
 const [customFaults, setCustomFaults] = useState([]);
-
+const [showCancelModal, setShowCancelModal] = useState(false);
+const [cancelRemarksInput, setCancelRemarksInput] = useState("");
+const [cancelling, setCancelling] = useState(false);
   /* ================= VALIDATION (NEW) ================= */
   const [touched, setTouched] = useState({});
   const [formErrors, setFormErrors] = useState({});
@@ -212,9 +214,10 @@ const validateField = (name, value) => {
   const [paymentMode, setPaymentMode] = useState("");
   const [estimate, setEstimate] = useState("");
   const [repairDate, setRepairDate] = useState(today);
-  const [deliveryDate, setDeliveryDate] = useState(today);
+  const [deliveryDate, setDeliveryDate] = useState("");
   const [remarks, setRemarks] = useState("");
-
+const [advanceAmount, setAdvanceAmount] = useState("");
+const [margin, setMargin] = useState("");
   /* ================= VISUAL ISSUES ================= */
   const addIssue = () => setVisualIssues([...visualIssues, ""]);
   const updateIssue = (i, val) => {
@@ -241,7 +244,33 @@ const validateForm = () => {
   return errors;
 };
 
-
+/* ================= CANCEL ================= */
+const handleCancel = async () => {
+  if (!cancelRemarksInput.trim()) {
+    alert("Please enter cancel reason");
+    return;
+  }
+  setCancelling(true);
+  try {
+    const user = JSON.parse(localStorage.getItem("user") || "{}");
+    const res = await axios.put(
+      `${API}/api/jobsheets/${localEditData._id}/cancel`,
+      {
+        cancelRemarks: cancelRemarksInput.trim(),
+        cancelledBy:   user?.username || "admin",
+      }
+    );
+    setLocalEditData(res.data);
+    setShowCancelModal(false);
+    setCancelRemarksInput("");
+    alert("Job Sheet Cancelled ✅");
+  } catch (err) {
+    console.error(err);
+    alert(err.response?.data?.message || "Cancel failed ❌");
+  } finally {
+    setCancelling(false);
+  }
+};
   /* ================= UPDATE ================= */
 const handleUpdate = async () => {
     // ✅ NEW: inline validation
@@ -282,7 +311,7 @@ const handleUpdate = async () => {
 
       formData.append(
         "service",
-        JSON.stringify({
+       JSON.stringify({
           engineer,
           dealer,
           drawer,
@@ -293,6 +322,8 @@ const handleUpdate = async () => {
           repairDate,
           deliveryDate,
           remarks,
+          advanceAmount: Number(advanceAmount || 0),
+          margin: Number(margin || 0),
         })
       );
 
@@ -348,7 +379,7 @@ const handleUpdate = async () => {
       formData.append("physicalCondition", JSON.stringify(physicalCondition));
       formData.append("accessories", JSON.stringify(accessories));
       formData.append("visualIssues", JSON.stringify(visualIssues.filter(Boolean)));
-      formData.append("service", JSON.stringify({ engineer, dealer, drawer, serviceCharge: Number(serviceCharge || 0), spareCharge: Number(spareCharge || 0), estimate, paymentMode, repairDate, deliveryDate, remarks }));
+    formData.append("service", JSON.stringify({ engineer, dealer, drawer, serviceCharge: Number(serviceCharge || 0), spareCharge: Number(spareCharge || 0), estimate, paymentMode, repairDate, deliveryDate, remarks, advanceAmount: Number(advanceAmount || 0), margin: Number(margin || 0) }));
       formData.append("spareItems", JSON.stringify(spareItems));
       formData.append("idProofType", idProofType);
       if (idProofImage) formData.append("idProofImage", idProofImage);
@@ -408,7 +439,8 @@ const handleUpdate = async () => {
     setEstimate("");
     setPaymentMode("");
     setRemarks("");
-
+setAdvanceAmount("");
+setMargin("");
     // ✅ NEW: reset validation state too
     setTouched({});
     setFormErrors({});
@@ -416,7 +448,7 @@ const handleUpdate = async () => {
 
     const today = new Date().toISOString().split("T")[0];
     setRepairDate(today);
-    setDeliveryDate(today);
+    setDeliveryDate("");
 
  if (nextNo) {
   setJobSheetNo(nextNo); // 🔥 DIRECT SET
@@ -473,8 +505,10 @@ setCustomFaults(rebuilt);
     setEstimate(editData.service?.estimate || "");
     setPaymentMode(editData.service?.paymentMode || "");
     setRepairDate(editData.service?.repairDate?.slice(0, 10) || today);
-    setDeliveryDate(editData.service?.deliveryDate?.slice(0, 10) || today);
+    setDeliveryDate(editData.service?.deliveryDate?.slice(0, 10) || "");
     setRemarks(editData.service?.remarks || "");
+    setAdvanceAmount(editData.service?.advanceAmount || "");
+setMargin(editData.service?.margin || "");
 
   }, [isEdit, editData,faultList]);
 
@@ -675,7 +709,7 @@ const getWorkloadBadge = (engName) => {
             
 
 
-            
+        
           </div>
 
         </div>
@@ -1195,28 +1229,47 @@ const getWorkloadBadge = (engName) => {
                 </div>
               </div>
 
-              {/* ROW 3 – Repair & Delivery Date */}
-              <div className="row g-2 mt-2">
-                <div className="col-md-3">
-                  <label className="form-label small fw-semibold mb-1">Repair Date</label>
-                  <input
-                    type="date"
-                    className="form-control form-control-sm"
-                    value={repairDate}
-                    onChange={(e) => setRepairDate(e.target.value)}
-                  />
-                </div>
-
-                <div className="col-md-3">
-                  <label className="form-label small fw-semibold mb-1">Delivery Date</label>
-                  <input
-                    type="date"
-                    className="form-control form-control-sm"
-                    value={deliveryDate}
-                    onChange={(e) => setDeliveryDate(e.target.value)}
-                  />
-                </div>
-              </div>
+{/* ROW 3 – Advance, Margin, Repair Date, Delivery Date */}
+<div className="row g-2 mt-2">
+  <div className="col-md-3">
+    <label className="form-label small fw-semibold mb-1">Advance Amount</label>
+    <input
+      type="text"
+      className="form-control form-control-sm"
+      placeholder="Advance ₹"
+      value={advanceAmount}
+      onChange={(e) => setAdvanceAmount(onlyNumbers(e.target.value))}
+    />
+  </div>
+  <div className="col-md-3">
+    <label className="form-label small fw-semibold mb-1">Margin</label>
+    <input
+      type="text"
+      className="form-control form-control-sm"
+      placeholder="Margin ₹"
+      value={margin}
+      onChange={(e) => setMargin(onlyNumbers(e.target.value))}
+    />
+  </div>
+  <div className="col-md-3">
+    <label className="form-label small fw-semibold mb-1">Repair Date</label>
+    <input
+      type="date"
+      className="form-control form-control-sm"
+      value={repairDate}
+      onChange={(e) => setRepairDate(e.target.value)}
+    />
+  </div>
+  <div className="col-md-3">
+    <label className="form-label small fw-semibold mb-1">Delivery Date</label>
+    <input
+      type="date"
+      className="form-control form-control-sm"
+      value={deliveryDate}
+      onChange={(e) => setDeliveryDate(e.target.value)}
+    />
+  </div>
+</div>
 
               {/* ROW 4 – Remarks */}
               <div className="row g-2 mt-2">
@@ -1336,13 +1389,39 @@ const getWorkloadBadge = (engName) => {
               {saving ? "Saving..." : "Save"}
             </button>
           )}
+{/* CANCEL — New entry la மட்டும் (saved jobsheet) or edit mode */}
+{isEdit && !localEditData?.isCancelled && !localEditData?.isInvoiced && (
+  <button
+    className="btn btn-outline-danger btn-sm"
+    onClick={() => setShowCancelModal(true)}
+  >
+    🚫 Cancel
+  </button>
+)}
 
-        {/* UPDATE (LOCK CONDITION) */}
-{isEdit && (!localEditData?.isInvoiced || localEditData?.rebillPending) && (
+{/* CANCELLED LOCK MESSAGE */}
+{localEditData?.isCancelled && (
+  <div className="alert alert-danger text-center mb-0 p-1" style={{ fontSize: 12 }}>
+    🚫 Job Cancelled — {localEditData.cancelRemarks}
+  </div>
+)}
+
+
+
+
+
+{isEdit && 
+ !localEditData?.isCancelled &&   // ← இதை add pannu
+ (!localEditData?.isInvoiced || localEditData?.rebillPending) && (
   <button className="btn btn-warning btn-sm" onClick={handleUpdate}>
     {localEditData?.rebillPending ? "💾 Save Rebill" : "Update"}
   </button>
 )}
+
+
+
+
+
          {/* LOCK MESSAGE + REBILL BUTTON */}
 {isEdit && localEditData?.isInvoiced && (
   <div className="d-flex align-items-center gap-2">
@@ -1475,7 +1554,55 @@ const getWorkloadBadge = (engName) => {
           onClose={() => setShowSearchModal(false)}
         />
       )}
-
+{/* CANCEL MODAL */}
+{showCancelModal && (
+  <div
+    className="modal d-block"
+    style={{ background: "rgba(0,0,0,0.5)", zIndex: 9999 }}
+    onClick={(e) => { if (e.target === e.currentTarget) setShowCancelModal(false); }}
+  >
+    <div className="modal-dialog modal-dialog-centered">
+      <div className="modal-content">
+        <div className="modal-header bg-danger text-white">
+          <h5 className="modal-title">🚫 Cancel Job Sheet — {jobSheetNo}</h5>
+          <button
+            className="btn-close btn-close-white"
+            onClick={() => setShowCancelModal(false)}
+          />
+        </div>
+        <div className="modal-body">
+          <p className="text-muted small mb-2">
+            ⚠️ Once cancelled, this job sheet cannot be edited or invoiced.
+          </p>
+          <label className="form-label fw-semibold">Cancel Reason <span className="text-danger">*</span></label>
+          <textarea
+            className="form-control"
+            rows={3}
+            placeholder="Enter reason for cancellation..."
+            value={cancelRemarksInput}
+            onChange={(e) => setCancelRemarksInput(e.target.value)}
+            autoFocus
+          />
+        </div>
+        <div className="modal-footer">
+          <button
+            className="btn btn-secondary"
+            onClick={() => { setShowCancelModal(false); setCancelRemarksInput(""); }}
+          >
+            Close
+          </button>
+          <button
+            className="btn btn-danger"
+            onClick={handleCancel}
+            disabled={cancelling || !cancelRemarksInput.trim()}
+          >
+            {cancelling ? "Cancelling..." : "Confirm Cancel"}
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+)}
    {sparePopup && (
         <SparePopup
           onClose={() => setSparePopup(false)}
