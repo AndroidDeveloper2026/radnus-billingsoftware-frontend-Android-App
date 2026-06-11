@@ -1,0 +1,518 @@
+import React, { useState, useEffect } from "react";
+import axios from "axios";
+import * as XLSX from "xlsx";
+
+const API = import.meta.env.VITE_API_URL;
+
+const fmt = (n) => n ? "₹" + Number(n).toLocaleString("en-IN") : "₹0";
+
+const statusColors = {
+  Received:          { bg: "#E1F5EE", color: "#0F6E56" },
+  Pending:           { bg: "#FAEEDA", color: "#854F0B" },
+  Repaired:          { bg: "#E6F1FB", color: "#185FA5" },
+  Delivered:         { bg: "#EAF3DE", color: "#3B6D11" },
+  "Delivered NR/NA": { bg: "#FAECE7", color: "#993C1D" },
+  Cancelled:         { bg: "#FAEAEA", color: "#991b1b" },
+};
+
+const StatusBadge = ({ status }) => {
+  const s = statusColors[status] || { bg: "#F1EFE8", color: "#5F5E5A" };
+  return (
+    <span style={{
+      background: s.bg, color: s.color,
+      padding: "2px 10px", borderRadius: 20,
+      fontSize: 11, fontWeight: 500, whiteSpace: "nowrap"
+    }}>
+      {status || "—"}
+    </span>
+  );
+};
+
+const avatarPalette = [
+  { bg: "#CECBF6", color: "#3C3489" },
+  { bg: "#9FE1CB", color: "#085041" },
+  { bg: "#FAC775", color: "#633806" },
+  { bg: "#B5D4F4", color: "#0C447C" },
+  { bg: "#F4C0D1", color: "#72243E" },
+];
+
+const Avatar = ({ name, idx }) => {
+  const c = avatarPalette[idx % avatarPalette.length];
+  return (
+    <div style={{
+      width: 34, height: 34, borderRadius: "50%",
+      background: c.bg, color: c.color,
+      display: "flex", alignItems: "center", justifyContent: "center",
+      fontSize: 13, fontWeight: 600, flexShrink: 0,
+    }}>
+      {(name || "?")[0].toUpperCase()}
+    </div>
+  );
+};
+
+const SummaryCard = ({ label, value, accent }) => (
+  <div style={{
+    background: "#fff", borderRadius: 10, padding: "14px 16px",
+    border: "1px solid #e9ecef", boxShadow: "0 1px 3px rgba(0,0,0,0.06)"
+  }}>
+    <div style={{ fontSize: 11, color: "#6c757d", marginBottom: 4 }}>{label}</div>
+    <div style={{ fontSize: 20, fontWeight: 600, color: accent || "#212529" }}>{value}</div>
+  </div>
+);
+
+/* ─── Shared Table Headers ─── */
+const JOB_HEADERS = ["#", "Job Sheet", "Sales Rep", "Created By", "Customer",
+  "Contact", "Device", "Status", "Service ₹", "Spare ₹", "Margin ₹", "Advance ₹", "Total ₹", "Date"];
+
+/* ─── Shared Job Row ─── */
+const JobRow = ({ job, i, rep }) => {
+  const sc  = Number(job.service?.serviceCharge || 0);
+  const sp  = Number(job.service?.spareCharge   || 0);
+  const mg  = Number(job.service?.margin        || 0);
+  const adv = Number(job.service?.advanceAmount || 0);
+  return (
+    <tr
+      style={{ borderBottom: "1px solid #f0f0f0" }}
+      onMouseEnter={e => e.currentTarget.style.background = "#f8f9fa"}
+      onMouseLeave={e => e.currentTarget.style.background = ""}
+    >
+      <td style={{ padding: "8px 10px", color: "#6c757d" }}>{i + 1}</td>
+
+      {/* Job Sheet No */}
+      <td style={{ padding: "8px 10px", color: "#0d6efd", fontWeight: 500 }}>
+        {job.jobSheetNo}
+      </td>
+
+      {/* ✅ Sales Rep */}
+      <td style={{ padding: "8px 10px" }}>
+        <span style={{
+          background: "#f0fdf4", color: "#166534",
+          borderRadius: 20, padding: "2px 10px",
+          fontSize: 11, fontWeight: 500
+        }}>
+          🧑‍💼 {job.service?.serviceRep || rep || "—"}
+        </span>
+      </td>
+
+      {/* ✅ Created By */}
+      <td style={{ padding: "8px 10px" }}>
+        <span style={{
+          background: "#eff6ff", color: "#1d4ed8",
+          borderRadius: 20, padding: "2px 10px",
+          fontSize: 11, fontWeight: 500
+        }}>
+          👤 {job.createdBy?.username || "—"}
+        </span>
+      </td>
+
+      <td style={{ padding: "8px 10px" }}>{job.customer?.name || "—"}</td>
+      <td style={{ padding: "8px 10px", color: "#6c757d" }}>{job.customer?.contact || "—"}</td>
+      <td style={{ padding: "8px 10px", color: "#6c757d" }}>
+        {[job.device?.make, job.device?.model].filter(Boolean).join(" ") || "—"}
+      </td>
+      <td style={{ padding: "8px 10px" }}>
+        <StatusBadge status={job.device?.mobileStatus} />
+      </td>
+      <td style={{ padding: "8px 10px", color: "#7c3aed", fontWeight: 500 }}>{sc ? fmt(sc) : "—"}</td>
+      <td style={{ padding: "8px 10px", color: "#db2777", fontWeight: 500 }}>{sp ? fmt(sp) : "—"}</td>
+      <td style={{ padding: "8px 10px", color: "#f59e0b", fontWeight: 500 }}>{mg ? fmt(mg) : "—"}</td>
+      <td style={{ padding: "8px 10px", color: "#0d6efd", fontWeight: 500 }}>{adv ? fmt(adv) : "—"}</td>
+      <td style={{ padding: "8px 10px", color: "#059669", fontWeight: 600 }}>{sc + sp ? fmt(sc + sp) : "—"}</td>
+      <td style={{ padding: "8px 10px", color: "#6c757d", whiteSpace: "nowrap" }}>
+        {new Date(job.createdAt).toLocaleDateString()}
+      </td>
+    </tr>
+  );
+};
+
+/* ═══════════════════════════════════════════════════
+   MAIN
+═══════════════════════════════════════════════════ */
+const SalesRepReportPage = () => {
+  const [data,       setData]       = useState({});
+  const [loading,    setLoading]    = useState(false);
+  const [searchText, setSearchText] = useState("");
+  const [fromDate,   setFromDate]   = useState("");
+  const [toDate,     setToDate]     = useState("");
+  const [repFilter,  setRepFilter]  = useState("");
+  const [view,       setView]       = useState("table");
+
+  useEffect(() => { fetchData(); }, []);
+
+  const fetchData = async (search = "", from = "", to = "") => {
+    try {
+      setLoading(true);
+      const res = await axios.get(`${API}/api/jobsheets/salesrep-report`, {
+        params: {
+          salesRep: search || undefined,
+          fromDate: from   || undefined,
+          toDate:   to     || undefined,
+        },
+      });
+      setData(res.data || {});
+    } catch (err) {
+      console.error("FETCH ERROR:", err);
+      setData({});
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSearch = () => fetchData(searchText, fromDate, toDate);
+  const handleClear  = () => { setSearchText(""); setFromDate(""); setToDate(""); fetchData(); };
+
+  /* ── computed ── */
+  const allJobs      = Object.values(data).flat();
+  const repList      = Object.keys(data).sort();
+  const totalJobs    = allJobs.length;
+  const today        = new Date().toLocaleDateString();
+  const todayJobs    = allJobs.filter(j => new Date(j.createdAt).toLocaleDateString() === today).length;
+  const totalService = allJobs.reduce((s, j) => s + Number(j.service?.serviceCharge || 0), 0);
+  const totalSpare   = allJobs.reduce((s, j) => s + Number(j.service?.spareCharge   || 0), 0);
+  const totalMargin  = allJobs.reduce((s, j) => s + Number(j.service?.margin        || 0), 0);
+  const totalAdvance = allJobs.reduce((s, j) => s + Number(j.service?.advanceAmount || 0), 0);
+  const grandTotal   = totalService + totalSpare;
+
+  /* ── per-rep summaries ── */
+  const repSummaries = repList.map((rep) => {
+    const jobs = data[rep];
+    const sc  = jobs.reduce((s, j) => s + Number(j.service?.serviceCharge || 0), 0);
+    const sp  = jobs.reduce((s, j) => s + Number(j.service?.spareCharge   || 0), 0);
+    const mg  = jobs.reduce((s, j) => s + Number(j.service?.margin        || 0), 0);
+    const adv = jobs.reduce((s, j) => s + Number(j.service?.advanceAmount || 0), 0);
+    const statusCount = {};
+    jobs.forEach(j => {
+      const st = j.device?.mobileStatus || "Unknown";
+      statusCount[st] = (statusCount[st] || 0) + 1;
+    });
+    return { rep, jobs: jobs.length, serviceCharge: sc, spareCharge: sp, margin: mg, advance: adv, total: sc + sp, statusCount };
+  });
+
+  const dashRep  = repFilter || repList[0] || "";
+  const dashJobs = dashRep && data[dashRep] ? data[dashRep] : [];
+
+  /* ── excel ── */
+  const handleExcel = () => {
+    const rows = [];
+    repList.forEach(rep => {
+      data[rep].forEach((job, i) => {
+        const sc = Number(job.service?.serviceCharge || 0);
+        const sp = Number(job.service?.spareCharge   || 0);
+        rows.push({
+          "Sales Rep":      job.service?.serviceRep || rep,
+          "Created By":     job.createdBy?.username || "—",
+          "SL No":          i + 1,
+          "Job Sheet":      job.jobSheetNo,
+          "Customer":       job.customer?.name    || "—",
+          "Contact":        job.customer?.contact || "—",
+          "Device":         [job.device?.make, job.device?.model].filter(Boolean).join(" ") || "—",
+          "Status":         job.device?.mobileStatus || "—",
+          "Service Charge": sc,
+          "Spare Charge":   sp,
+          "Margin":         Number(job.service?.margin        || 0),
+          "Advance":        Number(job.service?.advanceAmount || 0),
+          "Total":          sc + sp,
+          "Date":           new Date(job.createdAt).toLocaleDateString(),
+        });
+      });
+    });
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "SalesRep Report");
+    XLSX.writeFile(wb, `SalesRepReport_${new Date().toLocaleDateString("en-GB").replace(/\//g, "-")}.xlsx`);
+  };
+
+  /* ── shared table header row ── */
+  const TableHead = () => (
+    <thead>
+      <tr style={{ background: "#f8f9fa" }}>
+        {JOB_HEADERS.map(h => (
+          <th key={h} style={{
+            padding: "8px 10px", textAlign: "left",
+            borderBottom: "1px solid #e9ecef",
+            color: "#6c757d", fontWeight: 500, fontSize: 12, whiteSpace: "nowrap"
+          }}>{h}</th>
+        ))}
+      </tr>
+    </thead>
+  );
+
+  /* ─────────────────────────────────────────────────
+     RENDER
+  ───────────────────────────────────────────────── */
+  return (
+    <div style={{ maxWidth: 1300, margin: "0 auto", padding: "24px 16px", fontFamily: "system-ui, sans-serif" }}>
+
+      {/* TITLE + VIEW TOGGLE */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12, marginBottom: 20 }}>
+        <h4 style={{ fontWeight: 700, margin: 0, fontSize: 20 }}>🧑‍💼 Sales Rep Report</h4>
+        <div style={{ display: "flex", background: "#f1f3f5", borderRadius: 8, padding: 3 }}>
+          {[["table", "📋 Table"], ["dashboard", "📊 Dashboard"]].map(([val, label]) => (
+            <button key={val} onClick={() => setView(val)} style={{
+              padding: "6px 16px", borderRadius: 6, border: "none", cursor: "pointer",
+              fontSize: 13, fontWeight: 500,
+              background: view === val ? "#fff"    : "transparent",
+              color:      view === val ? "#0d6efd" : "#6c757d",
+              boxShadow:  view === val ? "0 1px 3px rgba(0,0,0,0.1)" : "none",
+            }}>{label}</button>
+          ))}
+        </div>
+      </div>
+
+      {/* SUMMARY CARDS */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(140px,1fr))", gap: 10, marginBottom: 20 }}>
+        <SummaryCard label="Total Reps"    value={repList.length} />
+        <SummaryCard label="Total Jobs"    value={totalJobs} />
+        <SummaryCard label="Today's Jobs"  value={todayJobs} />
+        <SummaryCard label="Service Total" value={fmt(totalService)}  accent="#7c3aed" />
+        <SummaryCard label="Spare Total"   value={fmt(totalSpare)}    accent="#db2777" />
+        <SummaryCard label="Grand Total"   value={fmt(grandTotal)}    accent="#059669" />
+        <SummaryCard label="Total Advance" value={fmt(totalAdvance)}  accent="#0d6efd" />
+        <SummaryCard label="Total Margin"  value={fmt(totalMargin)}   accent="#f59e0b" />
+      </div>
+
+      {/* FILTERS */}
+      <div style={{ display: "flex", gap: 8, marginBottom: 20, flexWrap: "wrap", alignItems: "flex-end" }}>
+        <input
+          className="form-control"
+          style={{ maxWidth: 240 }}
+          placeholder="Search sales rep name..."
+          value={searchText}
+          onChange={e => setSearchText(e.target.value)}
+          onKeyDown={e => e.key === "Enter" && handleSearch()}
+        />
+        <div>
+          <div style={{ fontSize: 11, color: "#6c757d", marginBottom: 3 }}>From</div>
+          <input type="date" className="form-control" style={{ maxWidth: 150 }}
+            value={fromDate} onChange={e => setFromDate(e.target.value)} />
+        </div>
+        <div>
+          <div style={{ fontSize: 11, color: "#6c757d", marginBottom: 3 }}>To</div>
+          <input type="date" className="form-control" style={{ maxWidth: 150 }}
+            value={toDate} onChange={e => setToDate(e.target.value)} />
+        </div>
+        <button className="btn btn-primary" onClick={handleSearch}>Search</button>
+        {(searchText || fromDate || toDate) && (
+          <button className="btn btn-outline-secondary" onClick={handleClear}>Clear</button>
+        )}
+        <button className="btn btn-success ms-auto" onClick={handleExcel} disabled={repList.length === 0}>
+          ⬇ Excel
+        </button>
+      </div>
+
+      {/* LOADING / EMPTY */}
+      {loading && <div className="text-center py-4 text-muted">Loading...</div>}
+      {!loading && repList.length === 0 && (
+        <div className="text-center text-muted py-4">No data found</div>
+      )}
+
+      {/* ══════════════════════════════════════
+          TABLE VIEW
+      ══════════════════════════════════════ */}
+      {!loading && view === "table" && repList.map((rep, idx) => {
+        const jobs = data[rep];
+        const uSC  = jobs.reduce((s, j) => s + Number(j.service?.serviceCharge || 0), 0);
+        const uSP  = jobs.reduce((s, j) => s + Number(j.service?.spareCharge   || 0), 0);
+        const uMG  = jobs.reduce((s, j) => s + Number(j.service?.margin        || 0), 0);
+        const uADV = jobs.reduce((s, j) => s + Number(j.service?.advanceAmount || 0), 0);
+        const uTOT = uSC + uSP;
+
+        return (
+          <div key={rep} style={{
+            border: "1px solid #e9ecef", borderRadius: 10,
+            overflow: "hidden", marginBottom: 28,
+            boxShadow: "0 1px 4px rgba(0,0,0,0.05)"
+          }}>
+
+            {/* REP HEADER */}
+            <div style={{
+              display: "flex", alignItems: "center", justifyContent: "space-between",
+              flexWrap: "wrap", gap: 10,
+              padding: "10px 16px", background: "#f8f9fa",
+              borderBottom: "1px solid #e9ecef"
+            }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <Avatar name={rep} idx={idx} />
+                <div>
+                  <span style={{ fontWeight: 700, fontSize: 15 }}>🧑‍💼 {rep}</span>
+                  <span style={{ fontSize: 12, color: "#6c757d", marginLeft: 8 }}>{jobs.length} jobs</span>
+                </div>
+              </div>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                {[
+                  { label: "Service", val: fmt(uSC),  color: "#7c3aed" },
+                  { label: "Spare",   val: fmt(uSP),  color: "#db2777" },
+                  { label: "Total",   val: fmt(uTOT), color: "#059669" },
+                  { label: "Advance", val: fmt(uADV), color: "#0d6efd" },
+                  { label: "Margin",  val: fmt(uMG),  color: "#f59e0b" },
+                ].map(p => (
+                  <div key={p.label} style={{
+                    background: "#fff", border: "1px solid #e9ecef",
+                    borderRadius: 20, padding: "3px 12px", fontSize: 12
+                  }}>
+                    <span style={{ color: "#6c757d" }}>{p.label}: </span>
+                    <span style={{ fontWeight: 600, color: p.color }}>{p.val}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* TABLE */}
+            <div style={{ overflowX: "auto" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                <TableHead />
+                <tbody>
+                  {jobs.map((job, i) => <JobRow key={job._id} job={job} i={i} rep={rep} />)}
+
+                  {/* SUBTOTAL — colSpan 8 (# + jobsheet + salesrep + createdby + customer + contact + device + status) */}
+                  <tr style={{ background: "#f0fdf4", borderTop: "2px solid #bbf7d0" }}>
+                    <td colSpan={8} style={{ padding: "8px 10px", fontWeight: 700, fontSize: 13, color: "#166534" }}>
+                      Subtotal — {rep}
+                    </td>
+                    <td style={{ padding: "8px 10px", fontWeight: 700, color: "#7c3aed" }}>{fmt(uSC)}</td>
+                    <td style={{ padding: "8px 10px", fontWeight: 700, color: "#db2777" }}>{fmt(uSP)}</td>
+                    <td style={{ padding: "8px 10px", fontWeight: 700, color: "#f59e0b" }}>{fmt(uMG)}</td>
+                    <td style={{ padding: "8px 10px", fontWeight: 700, color: "#0d6efd" }}>{fmt(uADV)}</td>
+                    <td style={{ padding: "8px 10px", fontWeight: 700, color: "#059669" }}>{fmt(uTOT)}</td>
+                    <td />
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        );
+      })}
+
+      {/* ══════════════════════════════════════
+          DASHBOARD VIEW
+      ══════════════════════════════════════ */}
+      {!loading && view === "dashboard" && (
+        <div>
+          <div style={{ marginBottom: 20 }}>
+            <div style={{ fontSize: 12, color: "#6c757d", marginBottom: 4, fontWeight: 500 }}>Select Sales Rep</div>
+            <select className="form-select" style={{ maxWidth: 240 }}
+              value={repFilter} onChange={e => setRepFilter(e.target.value)}>
+              <option value="">All Reps</option>
+              {repList.map(r => <option key={r} value={r}>{r}</option>)}
+            </select>
+          </div>
+
+          {/* ALL REPS OVERVIEW */}
+          {!repFilter && (
+            <div style={{ border: "1px solid #e9ecef", borderRadius: 10, overflow: "hidden", marginBottom: 28, boxShadow: "0 1px 4px rgba(0,0,0,0.05)" }}>
+              <div style={{ padding: "10px 16px", background: "#f8f9fa", borderBottom: "1px solid #e9ecef", fontWeight: 600, fontSize: 14 }}>
+                All Sales Reps — Overview
+              </div>
+              <div style={{ overflowX: "auto" }}>
+                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                  <thead>
+                    <tr style={{ background: "#f8f9fa" }}>
+                      {["Sales Rep", "Total Jobs", "Service ₹", "Spare ₹", "Total ₹", "Advance ₹", "Margin ₹"].map(h => (
+                        <th key={h} style={{ padding: "9px 12px", borderBottom: "1px solid #e9ecef", color: "#6c757d", fontWeight: 500, fontSize: 12, whiteSpace: "nowrap" }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {repSummaries.map((u, idx) => (
+                      <tr key={u.rep}
+                        style={{ borderBottom: "1px solid #f0f0f0", cursor: "pointer" }}
+                        onMouseEnter={e => e.currentTarget.style.background = "#f8f9fa"}
+                        onMouseLeave={e => e.currentTarget.style.background = ""}
+                        onClick={() => setRepFilter(u.rep)}
+                      >
+                        <td style={{ padding: "9px 12px" }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                            <Avatar name={u.rep} idx={idx} />
+                            <span style={{ fontWeight: 600 }}>🧑‍💼 {u.rep}</span>
+                          </div>
+                        </td>
+                        <td style={{ padding: "9px 12px", textAlign: "center" }}>
+                          <span style={{ background: "#e9ecef", borderRadius: 20, padding: "2px 10px", fontSize: 12, fontWeight: 600 }}>{u.jobs}</span>
+                        </td>
+                        <td style={{ padding: "9px 12px", color: "#7c3aed", fontWeight: 600 }}>{fmt(u.serviceCharge)}</td>
+                        <td style={{ padding: "9px 12px", color: "#db2777", fontWeight: 600 }}>{fmt(u.spareCharge)}</td>
+                        <td style={{ padding: "9px 12px", color: "#059669", fontWeight: 700 }}>{fmt(u.total)}</td>
+                        <td style={{ padding: "9px 12px", color: "#0d6efd", fontWeight: 600 }}>{fmt(u.advance)}</td>
+                        <td style={{ padding: "9px 12px", color: "#f59e0b", fontWeight: 600 }}>{fmt(u.margin)}</td>
+                      </tr>
+                    ))}
+                    <tr style={{ background: "#f0fdf4", borderTop: "2px solid #bbf7d0" }}>
+                      <td style={{ padding: "9px 12px", fontWeight: 700, color: "#166534" }}>Grand Total</td>
+                      <td style={{ padding: "9px 12px", textAlign: "center", fontWeight: 700 }}>{totalJobs}</td>
+                      <td style={{ padding: "9px 12px", fontWeight: 700, color: "#7c3aed" }}>{fmt(totalService)}</td>
+                      <td style={{ padding: "9px 12px", fontWeight: 700, color: "#db2777" }}>{fmt(totalSpare)}</td>
+                      <td style={{ padding: "9px 12px", fontWeight: 700, color: "#059669" }}>{fmt(grandTotal)}</td>
+                      <td style={{ padding: "9px 12px", fontWeight: 700, color: "#0d6efd" }}>{fmt(totalAdvance)}</td>
+                      <td style={{ padding: "9px 12px", fontWeight: 700, color: "#f59e0b" }}>{fmt(totalMargin)}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* SINGLE REP DETAIL */}
+          {repFilter && dashRep && (
+            <div>
+              <button className="btn btn-outline-secondary btn-sm mb-3" onClick={() => setRepFilter("")}>
+                ← All Reps
+              </button>
+
+              {(() => {
+                const u = repSummaries.find(x => x.rep === dashRep);
+                if (!u) return null;
+                return (
+                  <div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
+                      <Avatar name={u.rep} idx={repList.indexOf(u.rep)} />
+                      <span style={{ fontWeight: 700, fontSize: 16 }}>🧑‍💼 {u.rep}</span>
+                      <span style={{ fontSize: 13, color: "#6c757d" }}>{u.jobs} jobs</span>
+                    </div>
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(140px,1fr))", gap: 10, marginBottom: 20 }}>
+                      <SummaryCard label="Total Jobs"     value={u.jobs} />
+                      <SummaryCard label="Service Charge" value={fmt(u.serviceCharge)} accent="#7c3aed" />
+                      <SummaryCard label="Spare Charge"   value={fmt(u.spareCharge)}   accent="#db2777" />
+                      <SummaryCard label="Total Amount"   value={fmt(u.total)}          accent="#059669" />
+                      <SummaryCard label="Advance"        value={fmt(u.advance)}        accent="#0d6efd" />
+                      <SummaryCard label="Margin"         value={fmt(u.margin)}         accent="#f59e0b" />
+                    </div>
+                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 20 }}>
+                      {Object.entries(u.statusCount).map(([st, cnt]) => {
+                        const sc = statusColors[st] || { bg: "#f1f3f5", color: "#495057" };
+                        return (
+                          <div key={st} style={{
+                            background: sc.bg, color: sc.color,
+                            borderRadius: 20, padding: "4px 14px",
+                            fontSize: 12, fontWeight: 500,
+                            border: `1px solid ${sc.color}22`
+                          }}>
+                            {st}: <strong>{cnt}</strong>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* DASHBOARD JOB TABLE */}
+              <div style={{ border: "1px solid #e9ecef", borderRadius: 10, overflow: "hidden", boxShadow: "0 1px 4px rgba(0,0,0,0.05)" }}>
+                <div style={{ overflowX: "auto" }}>
+                  <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                    <TableHead />
+                    <tbody>
+                      {dashJobs.map((job, i) => <JobRow key={job._id} job={job} i={i} rep={dashRep} />)}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+    </div>
+  );
+};
+
+export default SalesRepReportPage;

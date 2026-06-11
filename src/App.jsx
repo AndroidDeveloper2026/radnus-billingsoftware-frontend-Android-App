@@ -6,6 +6,9 @@ import JobSheetEditWrapper from "./components/JobSheetEditWrapper";
 import Home from "./components/Home";
 import EstimateBill from "./components/EstimateBill";
 import RepairedReport from "./components/reports/Repairedreport";
+// App.jsx / routes-ல்
+import SalesRepReportPage from "./components/reports/SalesRepReportPage";
+
 
 import DailyPendingReport from "./components/reports/DailyPendingReport";
 import ReportPage from "./components/reports/MainReportPage";
@@ -66,7 +69,10 @@ function App() {
         <Route path="/all-report" element={<AllReportPage />} />
         <Route path="/engineer-all-report" element={<EngineerReportPage />} />
         <Route path="/dealer-report" element={<DealerReportPage />} />
-        <Route path="/user-report" element={<UserReportPage />} />
+
+
+<Route path="/salesrep-report" element={<SalesRepReportPage />} />
+     
         <Route path="/rebill-report" element={<RebillReportPage />} />
         <Route path="/user-list" element={<UserListPopup />} />
         <Route path="/spare-report" element={<SpareReportPage />} />

@@ -8,7 +8,6 @@ import DrawerPopup from "./popups/DrawerPopup";
 import EngineerPopup from "./popups/EngineerPopup";
 import UserAddition from "./popups/UserAddition";
 import UserListPopup from "./popups/UserListPopup";
-
 import axios from "axios";
 
 const Counter = ({ target }) => {
@@ -40,7 +39,7 @@ const NavItem = ({ title, items, onItemClick }) => {
         <ChevronDown size={14} className={`transition-transform duration-300 ${isOpen ? "rotate-180" : ""}`} />
       </div>
       {isOpen && (
-        <div className="absolute top-full left-0 mt-1 w-48 bg-slate-900 border border-slate-800 rounded-xl shadow-2xl py-2 z-50">
+        <div className="absolute top-full left-0 mt-1 w-52 bg-slate-900 border border-slate-800 rounded-xl shadow-2xl py-2 z-50">
           {items.map((item, idx) => (
             <div key={idx} onClick={() => handleClick(item)}
               className="px-4 py-2.5 text-sm text-slate-400 hover:bg-slate-800 hover:text-white transition-colors cursor-pointer">
@@ -56,7 +55,7 @@ const NavItem = ({ title, items, onItemClick }) => {
 const Home = () => {
   const navigate = useNavigate();
   const API = import.meta.env.VITE_API_URL;
-const user = JSON.parse(sessionStorage.getItem("user"));
+  const user = JSON.parse(sessionStorage.getItem("user"));
   const role = user?.role;
 
   const [stats, setStats] = useState({ totalJobs: 0, pendingJobs: 0, completedJobs: 0 });
@@ -69,11 +68,11 @@ const user = JSON.parse(sessionStorage.getItem("user"));
   const [showUserList,      setShowUserList]      = useState(false);
   const [mobileMenu,        setMobileMenu]        = useState(false);
 
- const handleLogout = () => {
-  sessionStorage.removeItem("token");
-  sessionStorage.removeItem("user");
-  navigate("/");
-};
+  const handleLogout = () => {
+    sessionStorage.removeItem("token");
+    sessionStorage.removeItem("user");
+    navigate("/");
+  };
 
   useEffect(() => {
     fetch(`${API}/api/dashboard/stats`)
@@ -81,6 +80,14 @@ const user = JSON.parse(sessionStorage.getItem("user"));
       .then(data => setStats(data))
       .catch(err => console.log(err));
   }, []);
+
+  // ✅ Admin dropdown handler — one place, all items
+  const handleAdminItem = (item) => {
+    if (item === "Engineer Addition") setShowEngineerModal(true);
+    if (item === "User List")         setShowUserList(true);
+    if (item === "User Addition")     setShowUserModal(true);
+    if (item === "Sales Rep Report")  navigate("/salesrep-report"); // ✅
+  };
 
   return (
     <div className="min-h-screen flex flex-col bg-slate-950 text-white">
@@ -94,17 +101,15 @@ const user = JSON.parse(sessionStorage.getItem("user"));
           <div onClick={() => navigate("/jobsheet")} className="px-4 py-2 cursor-pointer text-slate-300 hover:text-indigo-400 text-sm">
             Job Sheet
           </div>
+
           {role === "admin" && (
-            <NavItem title="Admin Operation"
-              items={["Engineer Addition", "User List", "User Addition", "User Report"]}
-              onItemClick={(item) => {
-                if (item === "Engineer Addition") setShowEngineerModal(true);
-                if (item === "User List")         setShowUserList(true);
-                if (item === "User Addition")     setShowUserModal(true);
-                if (item === "User Report")       navigate("/user-report");
-              }}
+            <NavItem
+              title="Admin Operation"
+              items={["Engineer Addition", "User List", "User Addition", "Sales Rep Report"]} // ✅ இங்கே மாத்தினோம்
+              onItemClick={handleAdminItem}
             />
           )}
+
           <NavItem title="Data Operation"
             items={["Fault", "Make", "Model", "Drawer"]}
             onItemClick={(item) => {
@@ -129,10 +134,10 @@ const user = JSON.parse(sessionStorage.getItem("user"));
           {role === "admin" && (
             <>
               <div className="px-4 py-3 text-slate-300 font-semibold">Admin Operation</div>
-              <div onClick={() => setShowEngineerModal(true)} className="px-6 py-2 text-slate-400">Engineer Addition</div>
-              <div onClick={() => setShowUserList(true)} className="px-6 py-2 text-slate-400">User List</div>
-              <div onClick={() => setShowUserModal(true)} className="px-6 py-2 text-slate-400">User Addition</div>
-              <div onClick={() => navigate("/user-report")} className="px-6 py-2 text-slate-400">User Report</div>
+              <div onClick={() => { setShowEngineerModal(true); setMobileMenu(false); }} className="px-6 py-2 text-slate-400">Engineer Addition</div>
+              <div onClick={() => { setShowUserList(true); setMobileMenu(false); }} className="px-6 py-2 text-slate-400">User List</div>
+              <div onClick={() => { setShowUserModal(true); setMobileMenu(false); }} className="px-6 py-2 text-slate-400">User Addition</div>
+              <div onClick={() => { navigate("/salesrep-report"); setMobileMenu(false); }} className="px-6 py-2 text-slate-400">Sales Rep Report</div> {/* ✅ */}
             </>
           )}
           <div onClick={() => { setShowFaultModal(true);  setMobileMenu(false); }} className="px-6 py-2 text-slate-400">Fault</div>
@@ -146,8 +151,6 @@ const user = JSON.parse(sessionStorage.getItem("user"));
 
       {/* MAIN */}
       <main className="flex-1 container mx-auto px-6 py-8 flex flex-col items-center">
-
-        {/* Hero */}
         <div className="text-center max-w-4xl mb-8">
           <span className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-xs font-bold uppercase tracking-widest mb-4">
             <Zap size={14} />Enterprise Performance Monitor
@@ -163,14 +166,12 @@ const user = JSON.parse(sessionStorage.getItem("user"));
           </p>
         </div>
 
-
-
         {/* METRICS */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8 w-full max-w-6xl mb-10">
           {[
-            { icon: <BarChart2 size={28} />, label: "Total Service Jobs",   value: stats.totalJobs },
-            { icon: <Clock size={28} />,     label: "Pending Service",      value: stats.pendingJobs },
-            { icon: <CheckCircle size={28} />, label: "Completed Service",  value: stats.completedJobs },
+            { icon: <BarChart2 size={28} />, label: "Total Service Jobs",  value: stats.totalJobs },
+            { icon: <Clock size={28} />,     label: "Pending Service",     value: stats.pendingJobs },
+            { icon: <CheckCircle size={28} />, label: "Completed Service", value: stats.completedJobs },
           ].map((metric, idx) => (
             <div key={idx} className="p-8 rounded-3xl bg-slate-900/60 border border-white/5 backdrop-blur-xl shadow-xl">
               <div className="mb-6 text-indigo-400">{metric.icon}</div>
@@ -179,16 +180,15 @@ const user = JSON.parse(sessionStorage.getItem("user"));
             </div>
           ))}
         </div>
-
       </main>
 
-      {showMakeModal     && <AdminMakeModal onClose={() => setShowMakeModal(false)} />}
-      {showModelModal    && <AdminModelModal onClose={() => setShowModelModal(false)} />}
-      {showFaultModal    && <FaultPopup onClose={() => setShowFaultModal(false)} />}
-      {showDrawerModal   && <DrawerPopup onClose={() => setShowDrawerModal(false)} />}
-      {showEngineerModal && <EngineerPopup onClose={() => setShowEngineerModal(false)} />}
-      {showUserModal     && <UserAddition onClose={() => setShowUserModal(false)} />}
-      {showUserList      && <UserListPopup onClose={() => setShowUserList(false)} />}
+      {showMakeModal     && <AdminMakeModal    onClose={() => setShowMakeModal(false)} />}
+      {showModelModal    && <AdminModelModal   onClose={() => setShowModelModal(false)} />}
+      {showFaultModal    && <FaultPopup        onClose={() => setShowFaultModal(false)} />}
+      {showDrawerModal   && <DrawerPopup       onClose={() => setShowDrawerModal(false)} />}
+      {showEngineerModal && <EngineerPopup     onClose={() => setShowEngineerModal(false)} />}
+      {showUserModal     && <UserAddition      onClose={() => setShowUserModal(false)} />}
+      {showUserList      && <UserListPopup     onClose={() => setShowUserList(false)} />}
 
       <footer className="py-8 border-t border-white/5 text-center text-xs text-slate-500 uppercase tracking-widest">
         © 2026 Radnus Communication • Service Billing Platform

@@ -147,7 +147,8 @@ const validateField = (name, value) => {
   const [idProofType, setIdProofType] = useState("");
   const [idProofImage, setIdProofImage] = useState(null);
   const [idProofPreview, setIdProofPreview] = useState(null);
-
+const [serviceRep, setServiceRep] = useState("");
+const [salesRepList, setSalesRepList] = useState([]);
   /* ================= CHECKBOX ARRAYS ================= */
   const [physicalCondition, setPhysicalCondition] = useState([]);
   const [accessories, setAccessories] = useState([]);
@@ -159,7 +160,11 @@ const validateField = (name, value) => {
       .then(res => setFaultList(res.data))
       .catch(err => console.error(err));
   }, []);
-
+useEffect(() => {
+  axios.get(`${API}/api/salesreps`)
+    .then(res => setSalesRepList(res.data))
+    .catch(err => console.error(err));
+}, []);
   const toggleCheckbox = (value, state, setState) => {
     setState(
       state.includes(value)
@@ -167,6 +172,9 @@ const validateField = (name, value) => {
         : [...state, value]
     );
   };
+
+
+
 
 /* ── WORKLOAD MAP: { "Barani": 4, "Ajith": 5 } ── */
   const [workloadMap, setWorkloadMap] = useState({});
@@ -218,6 +226,36 @@ const validateField = (name, value) => {
   const [remarks, setRemarks] = useState("");
 const [advanceAmount, setAdvanceAmount] = useState("");
 const [margin, setMargin] = useState("");
+
+
+
+
+
+useEffect(() => {
+  const est = Number(estimate || 0);
+  const spare = Number(spareCharge || 0);
+  if (est > 0 || spare > 0) {
+    setMargin(String(est - spare));
+  }
+}, [estimate, spareCharge]);
+
+
+useEffect(() => {
+  const service = Number(serviceCharge || 0);
+  const spare = Number(spareCharge || 0);
+  if (service > 0 || spare > 0) {
+    const est = service + spare;
+    setEstimate(String(est));
+    setMargin(String(est - spare)); // margin = estimate - spare = service charge
+  }
+}, [serviceCharge, spareCharge]);
+
+
+
+
+
+
+
   /* ================= VISUAL ISSUES ================= */
   const addIssue = () => setVisualIssues([...visualIssues, ""]);
   const updateIssue = (i, val) => {
@@ -316,6 +354,7 @@ const handleUpdate = async () => {
           engineer,
           dealer,
           drawer,
+           serviceRep,
           serviceCharge: Number(serviceCharge || 0),
           spareCharge: Number(spareCharge || 0),
           estimate,
@@ -380,7 +419,7 @@ const handleUpdate = async () => {
       formData.append("physicalCondition", JSON.stringify(physicalCondition));
       formData.append("accessories", JSON.stringify(accessories));
       formData.append("visualIssues", JSON.stringify(visualIssues.filter(Boolean)));
-    formData.append("service", JSON.stringify({ engineer, dealer, drawer, serviceCharge: Number(serviceCharge || 0), spareCharge: Number(spareCharge || 0), estimate, paymentMode, repairDate, deliveryDate, remarks, advanceAmount: Number(advanceAmount || 0), margin: Number(margin || 0) }));
+    formData.append("service", JSON.stringify({ engineer, dealer, drawer,  serviceRep,serviceCharge: Number(serviceCharge || 0), spareCharge: Number(spareCharge || 0), estimate, paymentMode, repairDate, deliveryDate, remarks, advanceAmount: Number(advanceAmount || 0), margin: Number(margin || 0) }));
       formData.append("spareItems", JSON.stringify(spareItems));
       formData.append("idProofType", idProofType);
       if (idProofImage) formData.append("idProofImage", idProofImage);
@@ -413,7 +452,7 @@ const handleUpdate = async () => {
     setAltContact("");
     setAddress("");
     setEmail("");
-
+setServiceRep("");
     setMake("");
     setCustomMake("");
     setModel("");
@@ -470,7 +509,7 @@ setCustomFaults({});
     setAltContact(editData.customer?.altContact || "");
     setAddress(editData.customer?.address || "");
     setEmail(editData.customer?.email || "");
-
+setServiceRep(editData.service?.serviceRep || "");
 
     // DEVICE
     setMake(editData.device?.make || "");
@@ -1205,17 +1244,16 @@ const getWorkloadBadge = (engName) => {
                   />
                 </div>
 
-
-                <div className="col-md-3">
-                  <input
-                    className="form-control form-control-sm"
-                    placeholder="Estimate Amount / Time"
-                    value={estimate}
-                    onChange={(e) => setEstimate(onlyNumbers(e.target.value))}
-                  />
-
-                </div>
-
+<div className="col-md-3">
+  <input
+    className="form-control form-control-sm"
+    placeholder="Estimate Amount / Time"
+    value={estimate}
+    readOnly
+    style={{ background: "#f8f9fa", cursor: "not-allowed" }}
+    onChange={(e) => setEstimate(onlyNumbers(e.target.value))}
+  />
+</div>
                 <div className="col-md-3">
                   <select
                     className="form-select form-select-sm"
@@ -1230,7 +1268,7 @@ const getWorkloadBadge = (engName) => {
                 </div>
               </div>
 
-{/* ROW 3 – Advance, Margin, Repair Date, Delivery Date */}
+{/* ROW 3 – Advance, Margin, Service Rep */}
 <div className="row g-2 mt-2">
   <div className="col-md-3">
     <label className="form-label small fw-semibold mb-1">Advance Amount</label>
@@ -1244,15 +1282,36 @@ const getWorkloadBadge = (engName) => {
   </div>
   <div className="col-md-3">
     <label className="form-label small fw-semibold mb-1">Margin</label>
-    <input
-      type="text"
-      className="form-control form-control-sm"
-      placeholder="Margin ₹"
-      value={margin}
-      onChange={(e) => setMargin(onlyNumbers(e.target.value))}
-    />
+  <input
+  type="text"
+  className="form-control form-control-sm"
+  placeholder="Margin ₹"
+  value={margin}
+  readOnly  // ← இதை add பண்ணு
+  style={{ background: "#f8f9fa", cursor: "not-allowed" }}
+  onChange={(e) => setMargin(onlyNumbers(e.target.value))}
+/>
   </div>
-  <div className="col-md-3">
+  <div className="col-md-6">
+    <label className="form-label small fw-semibold mb-1">Service Rep</label>
+    <select
+      className="form-select form-select-sm"
+      value={serviceRep}
+      onChange={e => setServiceRep(e.target.value)}
+    >
+      <option value="">Select Service Rep</option>
+      {salesRepList.map((rep, i) => (
+        <option key={i} value={rep.name || rep}>
+          {rep.name || rep}
+        </option>
+      ))}
+    </select>
+  </div>
+</div>
+
+{/* ROW 4 – Repair Date, Delivery Date */}
+<div className="row g-2 mt-2">
+  <div className="col-md-6">
     <label className="form-label small fw-semibold mb-1">Repair Date</label>
     <input
       type="date"
@@ -1261,7 +1320,7 @@ const getWorkloadBadge = (engName) => {
       onChange={(e) => setRepairDate(e.target.value)}
     />
   </div>
-  <div className="col-md-3">
+  <div className="col-md-6">
     <label className="form-label small fw-semibold mb-1">Delivery Date</label>
     <input
       type="date"
@@ -1411,9 +1470,15 @@ const getWorkloadBadge = (engName) => {
 
 
 
-{isEdit && 
+{/* {isEdit && 
  !localEditData?.isCancelled &&   // ← இதை add pannu
  (!localEditData?.isInvoiced || localEditData?.rebillPending) && (
+  <button className="btn btn-warning btn-sm" onClick={handleUpdate}>
+    {localEditData?.rebillPending ? "💾 Save Rebill" : "Update"}
+  </button>
+)} */}
+
+{isEdit && !localEditData?.isCancelled && (
   <button className="btn btn-warning btn-sm" onClick={handleUpdate}>
     {localEditData?.rebillPending ? "💾 Save Rebill" : "Update"}
   </button>
@@ -1421,14 +1486,10 @@ const getWorkloadBadge = (engName) => {
 
 
 
-
-
          {/* LOCK MESSAGE + REBILL BUTTON */}
 {isEdit && localEditData?.isInvoiced && (
   <div className="d-flex align-items-center gap-2">
-    <div className="alert alert-danger text-center mb-0 p-1" style={{ fontSize: 12 }}>
-      🔒 Invoice Generated — Edit Disabled
-    </div>
+  
     <button
       onClick={async () => {
         const rebillCount = (localEditData.rebillHistory?.length || 0) + 1;
