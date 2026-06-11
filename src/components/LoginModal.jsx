@@ -35,9 +35,9 @@ const LoginModal = ({ show, onClose }) => {
         return;
       }
 
-      localStorage.setItem("token", data.token);
-      localStorage.setItem("user", JSON.stringify(data.user));
-
+     // இந்த 2 lines மாத்து
+sessionStorage.setItem("token", data.token);
+sessionStorage.setItem("user", JSON.stringify(data.user));
       onClose();
 
       // ✅ Engineer → /engineer/ajith (name lowercase)

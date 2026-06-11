@@ -252,7 +252,8 @@ const handleCancel = async () => {
   }
   setCancelling(true);
   try {
-    const user = JSON.parse(localStorage.getItem("user") || "{}");
+    const user = JSON.parse(sessionStorage.getItem("user") || "{}");
+    
     const res = await axios.put(
       `${API}/api/jobsheets/${localEditData._id}/cancel`,
       {
@@ -369,7 +370,7 @@ const handleUpdate = async () => {
 
    setSaving(true);
 
-    const user = JSON.parse(localStorage.getItem("user"));
+    const user = JSON.parse(sessionStorage.getItem("user"));
 
     try {
       const formData = new FormData();
@@ -1437,7 +1438,7 @@ const getWorkloadBadge = (engName) => {
         if (!confirmed) return;
         setRebilling(true);
         try {
-          const user = JSON.parse(localStorage.getItem("user") || "{}");
+          const user = JSON.parse(sessionStorage.getItem("user") || "{}");
           const res = await axios.put(`${API}/api/jobsheets/${localEditData._id}/rebill`, {
             rebilledBy: user?.username || "admin",
           });

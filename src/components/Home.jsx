@@ -56,7 +56,7 @@ const NavItem = ({ title, items, onItemClick }) => {
 const Home = () => {
   const navigate = useNavigate();
   const API = import.meta.env.VITE_API_URL;
-  const user = JSON.parse(localStorage.getItem("user"));
+const user = JSON.parse(sessionStorage.getItem("user"));
   const role = user?.role;
 
   const [stats, setStats] = useState({ totalJobs: 0, pendingJobs: 0, completedJobs: 0 });
@@ -69,11 +69,11 @@ const Home = () => {
   const [showUserList,      setShowUserList]      = useState(false);
   const [mobileMenu,        setMobileMenu]        = useState(false);
 
-  const handleLogout = () => {
-    localStorage.removeItem("token");
-    localStorage.removeItem("user");
-    navigate("/");
-  };
+ const handleLogout = () => {
+  sessionStorage.removeItem("token");
+  sessionStorage.removeItem("user");
+  navigate("/");
+};
 
   useEffect(() => {
     fetch(`${API}/api/dashboard/stats`)
