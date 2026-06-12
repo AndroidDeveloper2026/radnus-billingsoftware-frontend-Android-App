@@ -18,14 +18,19 @@ const statusColors = {
 const StatusBadge = ({ status }) => {
   const s = statusColors[status] || { bg: "#F1EFE8", color: "#5F5E5A" };
   return (
-    <span style={{
-      background: s.bg, color: s.color,
-      padding: "2px 10px", borderRadius: 20,
-      fontSize: 11, fontWeight: 500, whiteSpace: "nowrap"
-    }}>
+    <span style={{ background: s.bg, color: s.color, padding: "2px 10px", borderRadius: 20, fontSize: 11, fontWeight: 500, whiteSpace: "nowrap" }}>
       {status || "—"}
     </span>
   );
+};
+
+// ✅ Insta / Google — plain text
+const SocialText = ({ val }) => {
+  if (!val || val === "-" || val === "") return <span style={{ color: "#94a3b8", fontSize: 11 }}>—</span>;
+  if (val === "Already Done") return <span style={{ fontSize: 11, color: "#1e293b" }}>Done</span>;
+  if (val === "Yes")  return <span style={{ fontSize: 11, color: "#1e293b" }}>Yes</span>;
+  if (val === "No")   return <span style={{ fontSize: 11, color: "#1e293b" }}>No</span>;
+  return <span style={{ fontSize: 11, color: "#1e293b" }}>{val}</span>;
 };
 
 const avatarPalette = [
@@ -39,72 +44,50 @@ const avatarPalette = [
 const Avatar = ({ name, idx }) => {
   const c = avatarPalette[idx % avatarPalette.length];
   return (
-    <div style={{
-      width: 34, height: 34, borderRadius: "50%",
-      background: c.bg, color: c.color,
-      display: "flex", alignItems: "center", justifyContent: "center",
-      fontSize: 13, fontWeight: 600, flexShrink: 0,
-    }}>
+    <div style={{ width: 34, height: 34, borderRadius: "50%", background: c.bg, color: c.color, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 600, flexShrink: 0 }}>
       {(name || "?")[0].toUpperCase()}
     </div>
   );
 };
 
 const SummaryCard = ({ label, value, accent }) => (
-  <div style={{
-    background: "#fff", borderRadius: 10, padding: "14px 16px",
-    border: "1px solid #e9ecef", boxShadow: "0 1px 3px rgba(0,0,0,0.06)"
-  }}>
+  <div style={{ background: "#fff", borderRadius: 10, padding: "14px 16px", border: "1px solid #e9ecef", boxShadow: "0 1px 3px rgba(0,0,0,0.06)" }}>
     <div style={{ fontSize: 11, color: "#6c757d", marginBottom: 4 }}>{label}</div>
     <div style={{ fontSize: 20, fontWeight: 600, color: accent || "#212529" }}>{value}</div>
   </div>
 );
 
-/* ─── Shared Table Headers ─── */
-const JOB_HEADERS = ["#", "Job Sheet", "Sales Rep", "Created By", "Customer",
-  "Contact", "Device", "Status", "Service ₹", "Spare ₹", "Margin ₹", "Advance ₹", "Total ₹", "Date"];
+// ✅ Updated headers — added Insta + Google
+const JOB_HEADERS = [
+  "#", "Job Sheet", "Sales Rep", "Created By", "Customer",
+  "Contact", "Device", "Status",
+  "Service ₹", "Spare ₹", "Margin ₹", "Advance ₹","Adv. Date", "Total ₹",
+  "📸 Insta", "⭐ Google", // ✅ NEW
+  "Date"
+];
 
-/* ─── Shared Job Row ─── */
+// ✅ Updated JobRow — added Insta + Google cells
 const JobRow = ({ job, i, rep }) => {
   const sc  = Number(job.service?.serviceCharge || 0);
   const sp  = Number(job.service?.spareCharge   || 0);
   const mg  = Number(job.service?.margin        || 0);
   const adv = Number(job.service?.advanceAmount || 0);
   return (
-    <tr
-      style={{ borderBottom: "1px solid #f0f0f0" }}
+    <tr style={{ borderBottom: "1px solid #f0f0f0" }}
       onMouseEnter={e => e.currentTarget.style.background = "#f8f9fa"}
-      onMouseLeave={e => e.currentTarget.style.background = ""}
-    >
+      onMouseLeave={e => e.currentTarget.style.background = ""}>
       <td style={{ padding: "8px 10px", color: "#6c757d" }}>{i + 1}</td>
-
-      {/* Job Sheet No */}
-      <td style={{ padding: "8px 10px", color: "#0d6efd", fontWeight: 500 }}>
-        {job.jobSheetNo}
-      </td>
-
-      {/* ✅ Sales Rep */}
+      <td style={{ padding: "8px 10px", color: "#0d6efd", fontWeight: 500 }}>{job.jobSheetNo}</td>
       <td style={{ padding: "8px 10px" }}>
-        <span style={{
-          background: "#f0fdf4", color: "#166534",
-          borderRadius: 20, padding: "2px 10px",
-          fontSize: 11, fontWeight: 500
-        }}>
+        <span style={{ background: "#f0fdf4", color: "#166534", borderRadius: 20, padding: "2px 10px", fontSize: 11, fontWeight: 500 }}>
           🧑‍💼 {job.service?.serviceRep || rep || "—"}
         </span>
       </td>
-
-      {/* ✅ Created By */}
       <td style={{ padding: "8px 10px" }}>
-        <span style={{
-          background: "#eff6ff", color: "#1d4ed8",
-          borderRadius: 20, padding: "2px 10px",
-          fontSize: 11, fontWeight: 500
-        }}>
+        <span style={{ background: "#eff6ff", color: "#1d4ed8", borderRadius: 20, padding: "2px 10px", fontSize: 11, fontWeight: 500 }}>
           👤 {job.createdBy?.username || "—"}
         </span>
       </td>
-
       <td style={{ padding: "8px 10px" }}>{job.customer?.name || "—"}</td>
       <td style={{ padding: "8px 10px", color: "#6c757d" }}>{job.customer?.contact || "—"}</td>
       <td style={{ padding: "8px 10px", color: "#6c757d" }}>
@@ -117,7 +100,18 @@ const JobRow = ({ job, i, rep }) => {
       <td style={{ padding: "8px 10px", color: "#db2777", fontWeight: 500 }}>{sp ? fmt(sp) : "—"}</td>
       <td style={{ padding: "8px 10px", color: "#f59e0b", fontWeight: 500 }}>{mg ? fmt(mg) : "—"}</td>
       <td style={{ padding: "8px 10px", color: "#0d6efd", fontWeight: 500 }}>{adv ? fmt(adv) : "—"}</td>
+
+      <td style={{ padding: "8px 10px", color: "#0369a1", fontSize: 11, whiteSpace: "nowrap" }}>
+  {job.service?.advanceDate
+    ? new Date(job.service.advanceDate).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "2-digit" })
+    : "—"}
+</td>
+
+<td style={{ padding: "8px 10px", color: "#059669", fontWeight: 600 }}>{sc + sp ? fmt(sc + sp) : "—"}</td>  
       <td style={{ padding: "8px 10px", color: "#059669", fontWeight: 600 }}>{sc + sp ? fmt(sc + sp) : "—"}</td>
+      {/* ✅ NEW */}
+      <td style={{ padding: "8px 10px", textAlign: "center" }}><SocialText val={job.service?.instaFollowers} /></td>
+      <td style={{ padding: "8px 10px", textAlign: "center" }}><SocialText val={job.service?.googleReview} /></td>
       <td style={{ padding: "8px 10px", color: "#6c757d", whiteSpace: "nowrap" }}>
         {new Date(job.createdAt).toLocaleDateString()}
       </td>
@@ -143,11 +137,7 @@ const SalesRepReportPage = () => {
     try {
       setLoading(true);
       const res = await axios.get(`${API}/api/jobsheets/salesrep-report`, {
-        params: {
-          salesRep: search || undefined,
-          fromDate: from   || undefined,
-          toDate:   to     || undefined,
-        },
+        params: { salesRep: search || undefined, fromDate: from || undefined, toDate: to || undefined },
       });
       setData(res.data || {});
     } catch (err) {
@@ -161,7 +151,6 @@ const SalesRepReportPage = () => {
   const handleSearch = () => fetchData(searchText, fromDate, toDate);
   const handleClear  = () => { setSearchText(""); setFromDate(""); setToDate(""); fetchData(); };
 
-  /* ── computed ── */
   const allJobs      = Object.values(data).flat();
   const repList      = Object.keys(data).sort();
   const totalJobs    = allJobs.length;
@@ -172,26 +161,30 @@ const SalesRepReportPage = () => {
   const totalMargin  = allJobs.reduce((s, j) => s + Number(j.service?.margin        || 0), 0);
   const totalAdvance = allJobs.reduce((s, j) => s + Number(j.service?.advanceAmount || 0), 0);
   const grandTotal   = totalService + totalSpare;
+  // ✅ NEW counts
+  const totalInstaYes  = allJobs.filter(j => j.service?.instaFollowers === "Yes").length;
+  const totalGoogleYes = allJobs.filter(j => j.service?.googleReview   === "Yes").length;
 
-  /* ── per-rep summaries ── */
   const repSummaries = repList.map((rep) => {
     const jobs = data[rep];
     const sc  = jobs.reduce((s, j) => s + Number(j.service?.serviceCharge || 0), 0);
     const sp  = jobs.reduce((s, j) => s + Number(j.service?.spareCharge   || 0), 0);
     const mg  = jobs.reduce((s, j) => s + Number(j.service?.margin        || 0), 0);
     const adv = jobs.reduce((s, j) => s + Number(j.service?.advanceAmount || 0), 0);
+    // ✅ NEW
+    const instaYes  = jobs.filter(j => j.service?.instaFollowers === "Yes").length;
+    const googleYes = jobs.filter(j => j.service?.googleReview   === "Yes").length;
     const statusCount = {};
     jobs.forEach(j => {
       const st = j.device?.mobileStatus || "Unknown";
       statusCount[st] = (statusCount[st] || 0) + 1;
     });
-    return { rep, jobs: jobs.length, serviceCharge: sc, spareCharge: sp, margin: mg, advance: adv, total: sc + sp, statusCount };
+    return { rep, jobs: jobs.length, serviceCharge: sc, spareCharge: sp, margin: mg, advance: adv, total: sc + sp, instaYes, googleYes, statusCount };
   });
 
   const dashRep  = repFilter || repList[0] || "";
   const dashJobs = dashRep && data[dashRep] ? data[dashRep] : [];
 
-  /* ── excel ── */
   const handleExcel = () => {
     const rows = [];
     repList.forEach(rep => {
@@ -211,7 +204,14 @@ const SalesRepReportPage = () => {
           "Spare Charge":   sp,
           "Margin":         Number(job.service?.margin        || 0),
           "Advance":        Number(job.service?.advanceAmount || 0),
+          "Advance Date":   job.service?.advanceDate
+  ? new Date(job.service.advanceDate).toLocaleDateString("en-IN")
+  : "—",
+
           "Total":          sc + sp,
+          // ✅ NEW
+          "Insta Follow":   job.service?.instaFollowers || "—",
+          "Google Review":  job.service?.googleReview   || "—",
           "Date":           new Date(job.createdAt).toLocaleDateString(),
         });
       });
@@ -222,26 +222,18 @@ const SalesRepReportPage = () => {
     XLSX.writeFile(wb, `SalesRepReport_${new Date().toLocaleDateString("en-GB").replace(/\//g, "-")}.xlsx`);
   };
 
-  /* ── shared table header row ── */
   const TableHead = () => (
     <thead>
       <tr style={{ background: "#f8f9fa" }}>
         {JOB_HEADERS.map(h => (
-          <th key={h} style={{
-            padding: "8px 10px", textAlign: "left",
-            borderBottom: "1px solid #e9ecef",
-            color: "#6c757d", fontWeight: 500, fontSize: 12, whiteSpace: "nowrap"
-          }}>{h}</th>
+          <th key={h} style={{ padding: "8px 10px", textAlign: "left", borderBottom: "1px solid #e9ecef", color: "#6c757d", fontWeight: 500, fontSize: 12, whiteSpace: "nowrap" }}>{h}</th>
         ))}
       </tr>
     </thead>
   );
 
-  /* ─────────────────────────────────────────────────
-     RENDER
-  ───────────────────────────────────────────────── */
   return (
-    <div style={{ maxWidth: 1300, margin: "0 auto", padding: "24px 16px", fontFamily: "system-ui, sans-serif" }}>
+    <div style={{ maxWidth: 1400, margin: "0 auto", padding: "24px 16px", fontFamily: "system-ui, sans-serif" }}>
 
       {/* TITLE + VIEW TOGGLE */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12, marginBottom: 20 }}>
@@ -259,7 +251,7 @@ const SalesRepReportPage = () => {
         </div>
       </div>
 
-      {/* SUMMARY CARDS */}
+      {/* SUMMARY CARDS — ✅ added Insta + Google */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(140px,1fr))", gap: 10, marginBottom: 20 }}>
         <SummaryCard label="Total Reps"    value={repList.length} />
         <SummaryCard label="Total Jobs"    value={totalJobs} />
@@ -269,27 +261,24 @@ const SalesRepReportPage = () => {
         <SummaryCard label="Grand Total"   value={fmt(grandTotal)}    accent="#059669" />
         <SummaryCard label="Total Advance" value={fmt(totalAdvance)}  accent="#0d6efd" />
         <SummaryCard label="Total Margin"  value={fmt(totalMargin)}   accent="#f59e0b" />
+        <SummaryCard label="📸 Instagram"  value={totalInstaYes}      accent="#e11d48" />
+        <SummaryCard label="⭐ Google Review" value={totalGoogleYes}     accent="#d97706" />
       </div>
 
       {/* FILTERS */}
       <div style={{ display: "flex", gap: 8, marginBottom: 20, flexWrap: "wrap", alignItems: "flex-end" }}>
-        <input
-          className="form-control"
-          style={{ maxWidth: 240 }}
+        <input className="form-control" style={{ maxWidth: 240 }}
           placeholder="Search sales rep name..."
           value={searchText}
           onChange={e => setSearchText(e.target.value)}
-          onKeyDown={e => e.key === "Enter" && handleSearch()}
-        />
+          onKeyDown={e => e.key === "Enter" && handleSearch()} />
         <div>
           <div style={{ fontSize: 11, color: "#6c757d", marginBottom: 3 }}>From</div>
-          <input type="date" className="form-control" style={{ maxWidth: 150 }}
-            value={fromDate} onChange={e => setFromDate(e.target.value)} />
+          <input type="date" className="form-control" style={{ maxWidth: 150 }} value={fromDate} onChange={e => setFromDate(e.target.value)} />
         </div>
         <div>
           <div style={{ fontSize: 11, color: "#6c757d", marginBottom: 3 }}>To</div>
-          <input type="date" className="form-control" style={{ maxWidth: 150 }}
-            value={toDate} onChange={e => setToDate(e.target.value)} />
+          <input type="date" className="form-control" style={{ maxWidth: 150 }} value={toDate} onChange={e => setToDate(e.target.value)} />
         </div>
         <button className="btn btn-primary" onClick={handleSearch}>Search</button>
         {(searchText || fromDate || toDate) && (
@@ -300,15 +289,10 @@ const SalesRepReportPage = () => {
         </button>
       </div>
 
-      {/* LOADING / EMPTY */}
       {loading && <div className="text-center py-4 text-muted">Loading...</div>}
-      {!loading && repList.length === 0 && (
-        <div className="text-center text-muted py-4">No data found</div>
-      )}
+      {!loading && repList.length === 0 && <div className="text-center text-muted py-4">No data found</div>}
 
-      {/* ══════════════════════════════════════
-          TABLE VIEW
-      ══════════════════════════════════════ */}
+      {/* ══ TABLE VIEW ══ */}
       {!loading && view === "table" && repList.map((rep, idx) => {
         const jobs = data[rep];
         const uSC  = jobs.reduce((s, j) => s + Number(j.service?.serviceCharge || 0), 0);
@@ -316,21 +300,15 @@ const SalesRepReportPage = () => {
         const uMG  = jobs.reduce((s, j) => s + Number(j.service?.margin        || 0), 0);
         const uADV = jobs.reduce((s, j) => s + Number(j.service?.advanceAmount || 0), 0);
         const uTOT = uSC + uSP;
+        // ✅ NEW
+        const uInsta  = jobs.filter(j => j.service?.instaFollowers === "Yes").length;
+        const uGoogle = jobs.filter(j => j.service?.googleReview   === "Yes").length;
 
         return (
-          <div key={rep} style={{
-            border: "1px solid #e9ecef", borderRadius: 10,
-            overflow: "hidden", marginBottom: 28,
-            boxShadow: "0 1px 4px rgba(0,0,0,0.05)"
-          }}>
+          <div key={rep} style={{ border: "1px solid #e9ecef", borderRadius: 10, overflow: "hidden", marginBottom: 28, boxShadow: "0 1px 4px rgba(0,0,0,0.05)" }}>
 
             {/* REP HEADER */}
-            <div style={{
-              display: "flex", alignItems: "center", justifyContent: "space-between",
-              flexWrap: "wrap", gap: 10,
-              padding: "10px 16px", background: "#f8f9fa",
-              borderBottom: "1px solid #e9ecef"
-            }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10, padding: "10px 16px", background: "#f8f9fa", borderBottom: "1px solid #e9ecef" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                 <Avatar name={rep} idx={idx} />
                 <div>
@@ -340,16 +318,15 @@ const SalesRepReportPage = () => {
               </div>
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                 {[
-                  { label: "Service", val: fmt(uSC),  color: "#7c3aed" },
-                  { label: "Spare",   val: fmt(uSP),  color: "#db2777" },
-                  { label: "Total",   val: fmt(uTOT), color: "#059669" },
-                  { label: "Advance", val: fmt(uADV), color: "#0d6efd" },
-                  { label: "Margin",  val: fmt(uMG),  color: "#f59e0b" },
+                  { label: "Service",   val: fmt(uSC),  color: "#7c3aed" },
+                  { label: "Spare",     val: fmt(uSP),  color: "#db2777" },
+                  { label: "Total",     val: fmt(uTOT), color: "#059669" },
+                  { label: "Advance",   val: fmt(uADV), color: "#0d6efd" },
+                  { label: "Margin",    val: fmt(uMG),  color: "#f59e0b" },
+                  { label: "📸 Insta",  val: uInsta,    color: "#e11d48" }, // ✅ NEW
+                  { label: "⭐ Google", val: uGoogle,   color: "#d97706" }, // ✅ NEW
                 ].map(p => (
-                  <div key={p.label} style={{
-                    background: "#fff", border: "1px solid #e9ecef",
-                    borderRadius: 20, padding: "3px 12px", fontSize: 12
-                  }}>
+                  <div key={p.label} style={{ background: "#fff", border: "1px solid #e9ecef", borderRadius: 20, padding: "3px 12px", fontSize: 12 }}>
                     <span style={{ color: "#6c757d" }}>{p.label}: </span>
                     <span style={{ fontWeight: 600, color: p.color }}>{p.val}</span>
                   </div>
@@ -364,16 +341,20 @@ const SalesRepReportPage = () => {
                 <tbody>
                   {jobs.map((job, i) => <JobRow key={job._id} job={job} i={i} rep={rep} />)}
 
-                  {/* SUBTOTAL — colSpan 8 (# + jobsheet + salesrep + createdby + customer + contact + device + status) */}
+                  {/* SUBTOTAL — colSpan 8 covers #,jobsheet,salesrep,createdby,customer,contact,device,status */}
                   <tr style={{ background: "#f0fdf4", borderTop: "2px solid #bbf7d0" }}>
-                    <td colSpan={8} style={{ padding: "8px 10px", fontWeight: 700, fontSize: 13, color: "#166534" }}>
-                      Subtotal — {rep}
-                    </td>
+                    <td colSpan={8} style={{ padding: "8px 10px", fontWeight: 700, fontSize: 13, color: "#166534" }}>Subtotal — {rep}</td>
                     <td style={{ padding: "8px 10px", fontWeight: 700, color: "#7c3aed" }}>{fmt(uSC)}</td>
                     <td style={{ padding: "8px 10px", fontWeight: 700, color: "#db2777" }}>{fmt(uSP)}</td>
                     <td style={{ padding: "8px 10px", fontWeight: 700, color: "#f59e0b" }}>{fmt(uMG)}</td>
-                    <td style={{ padding: "8px 10px", fontWeight: 700, color: "#0d6efd" }}>{fmt(uADV)}</td>
+{/* Subtotal row-ல் Advance ₹ td-கு அடுத்தே */}
+<td style={{ padding: "8px 10px", fontWeight: 700, color: "#0d6efd" }}>{fmt(uADV)}</td>
+<td /> {/* ✅ Adv. Date — empty */}
+<td style={{ padding: "8px 10px", fontWeight: 700, color: "#059669" }}>{fmt(uTOT)}</td>
                     <td style={{ padding: "8px 10px", fontWeight: 700, color: "#059669" }}>{fmt(uTOT)}</td>
+                    {/* ✅ NEW */}
+                    <td style={{ padding: "8px 10px", fontWeight: 700, color: "#e11d48", textAlign: "center" }}>{uInsta}</td>
+                    <td style={{ padding: "8px 10px", fontWeight: 700, color: "#d97706", textAlign: "center" }}>{uGoogle}</td>
                     <td />
                   </tr>
                 </tbody>
@@ -383,43 +364,36 @@ const SalesRepReportPage = () => {
         );
       })}
 
-      {/* ══════════════════════════════════════
-          DASHBOARD VIEW
-      ══════════════════════════════════════ */}
+      {/* ══ DASHBOARD VIEW ══ */}
       {!loading && view === "dashboard" && (
         <div>
           <div style={{ marginBottom: 20 }}>
             <div style={{ fontSize: 12, color: "#6c757d", marginBottom: 4, fontWeight: 500 }}>Select Sales Rep</div>
-            <select className="form-select" style={{ maxWidth: 240 }}
-              value={repFilter} onChange={e => setRepFilter(e.target.value)}>
+            <select className="form-select" style={{ maxWidth: 240 }} value={repFilter} onChange={e => setRepFilter(e.target.value)}>
               <option value="">All Reps</option>
               {repList.map(r => <option key={r} value={r}>{r}</option>)}
             </select>
           </div>
 
-          {/* ALL REPS OVERVIEW */}
+          {/* ALL REPS OVERVIEW — ✅ added Insta + Google columns */}
           {!repFilter && (
             <div style={{ border: "1px solid #e9ecef", borderRadius: 10, overflow: "hidden", marginBottom: 28, boxShadow: "0 1px 4px rgba(0,0,0,0.05)" }}>
-              <div style={{ padding: "10px 16px", background: "#f8f9fa", borderBottom: "1px solid #e9ecef", fontWeight: 600, fontSize: 14 }}>
-                All Sales Reps — Overview
-              </div>
+              <div style={{ padding: "10px 16px", background: "#f8f9fa", borderBottom: "1px solid #e9ecef", fontWeight: 600, fontSize: 14 }}>All Sales Reps — Overview</div>
               <div style={{ overflowX: "auto" }}>
                 <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
                   <thead>
                     <tr style={{ background: "#f8f9fa" }}>
-                      {["Sales Rep", "Total Jobs", "Service ₹", "Spare ₹", "Total ₹", "Advance ₹", "Margin ₹"].map(h => (
+                      {["Sales Rep", "Total Jobs", "Service ₹", "Spare ₹", "Total ₹", "Advance ₹", "Margin ₹", "📸 Insta Yes", "⭐ Google Yes"].map(h => (
                         <th key={h} style={{ padding: "9px 12px", borderBottom: "1px solid #e9ecef", color: "#6c757d", fontWeight: 500, fontSize: 12, whiteSpace: "nowrap" }}>{h}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
                     {repSummaries.map((u, idx) => (
-                      <tr key={u.rep}
-                        style={{ borderBottom: "1px solid #f0f0f0", cursor: "pointer" }}
+                      <tr key={u.rep} style={{ borderBottom: "1px solid #f0f0f0", cursor: "pointer" }}
                         onMouseEnter={e => e.currentTarget.style.background = "#f8f9fa"}
                         onMouseLeave={e => e.currentTarget.style.background = ""}
-                        onClick={() => setRepFilter(u.rep)}
-                      >
+                        onClick={() => setRepFilter(u.rep)}>
                         <td style={{ padding: "9px 12px" }}>
                           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                             <Avatar name={u.rep} idx={idx} />
@@ -434,6 +408,9 @@ const SalesRepReportPage = () => {
                         <td style={{ padding: "9px 12px", color: "#059669", fontWeight: 700 }}>{fmt(u.total)}</td>
                         <td style={{ padding: "9px 12px", color: "#0d6efd", fontWeight: 600 }}>{fmt(u.advance)}</td>
                         <td style={{ padding: "9px 12px", color: "#f59e0b", fontWeight: 600 }}>{fmt(u.margin)}</td>
+                        {/* ✅ NEW */}
+                        <td style={{ padding: "9px 12px", color: "#e11d48", fontWeight: 600, textAlign: "center" }}>{u.instaYes}</td>
+                        <td style={{ padding: "9px 12px", color: "#d97706", fontWeight: 600, textAlign: "center" }}>{u.googleYes}</td>
                       </tr>
                     ))}
                     <tr style={{ background: "#f0fdf4", borderTop: "2px solid #bbf7d0" }}>
@@ -444,6 +421,9 @@ const SalesRepReportPage = () => {
                       <td style={{ padding: "9px 12px", fontWeight: 700, color: "#059669" }}>{fmt(grandTotal)}</td>
                       <td style={{ padding: "9px 12px", fontWeight: 700, color: "#0d6efd" }}>{fmt(totalAdvance)}</td>
                       <td style={{ padding: "9px 12px", fontWeight: 700, color: "#f59e0b" }}>{fmt(totalMargin)}</td>
+                      {/* ✅ NEW */}
+                      <td style={{ padding: "9px 12px", fontWeight: 700, color: "#e11d48", textAlign: "center" }}>{totalInstaYes}</td>
+                      <td style={{ padding: "9px 12px", fontWeight: 700, color: "#d97706", textAlign: "center" }}>{totalGoogleYes}</td>
                     </tr>
                   </tbody>
                 </table>
@@ -454,10 +434,7 @@ const SalesRepReportPage = () => {
           {/* SINGLE REP DETAIL */}
           {repFilter && dashRep && (
             <div>
-              <button className="btn btn-outline-secondary btn-sm mb-3" onClick={() => setRepFilter("")}>
-                ← All Reps
-              </button>
-
+              <button className="btn btn-outline-secondary btn-sm mb-3" onClick={() => setRepFilter("")}>← All Reps</button>
               {(() => {
                 const u = repSummaries.find(x => x.rep === dashRep);
                 if (!u) return null;
@@ -475,17 +452,15 @@ const SalesRepReportPage = () => {
                       <SummaryCard label="Total Amount"   value={fmt(u.total)}          accent="#059669" />
                       <SummaryCard label="Advance"        value={fmt(u.advance)}        accent="#0d6efd" />
                       <SummaryCard label="Margin"         value={fmt(u.margin)}         accent="#f59e0b" />
+                      {/* ✅ NEW */}
+                      <SummaryCard label="📸 Insta Yes"  value={u.instaYes}             accent="#e11d48" />
+                      <SummaryCard label="⭐ Google Yes" value={u.googleYes}            accent="#d97706" />
                     </div>
                     <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 20 }}>
                       {Object.entries(u.statusCount).map(([st, cnt]) => {
                         const sc = statusColors[st] || { bg: "#f1f3f5", color: "#495057" };
                         return (
-                          <div key={st} style={{
-                            background: sc.bg, color: sc.color,
-                            borderRadius: 20, padding: "4px 14px",
-                            fontSize: 12, fontWeight: 500,
-                            border: `1px solid ${sc.color}22`
-                          }}>
+                          <div key={st} style={{ background: sc.bg, color: sc.color, borderRadius: 20, padding: "4px 14px", fontSize: 12, fontWeight: 500, border: `1px solid ${sc.color}22` }}>
                             {st}: <strong>{cnt}</strong>
                           </div>
                         );
@@ -495,7 +470,6 @@ const SalesRepReportPage = () => {
                 );
               })()}
 
-              {/* DASHBOARD JOB TABLE */}
               <div style={{ border: "1px solid #e9ecef", borderRadius: 10, overflow: "hidden", boxShadow: "0 1px 4px rgba(0,0,0,0.05)" }}>
                 <div style={{ overflowX: "auto" }}>
                   <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
@@ -510,9 +484,8 @@ const SalesRepReportPage = () => {
           )}
         </div>
       )}
-
     </div>
   );
 };
 
-export default SalesRepReportPage;
+export default SalesRepReportPage

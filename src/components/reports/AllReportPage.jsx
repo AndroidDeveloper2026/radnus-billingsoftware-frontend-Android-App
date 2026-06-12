@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useState, useEffect } from "react";
 import axios from "axios";
 import * as XLSX from "xlsx";
 import { useNavigate } from "react-router-dom";
@@ -90,12 +90,20 @@ const AllReportPage = () => {
       "Problems":           item.visualIssues?.join(", ") || "-",
       "Physical Condition": item.physicalCondition?.join(", ") || "-",
       "Accessories":        item.accessories?.join(", ") || "-",
-     "Advance Amount":     item.service?.advanceAmount || 0,
-"Margin":             item.service?.margin || 0,
-"Remarks":            item.service?.remarks || "-",
-      "Cancel Remarks": item.cancelRemarks || "-",
-"Cancelled By":   item.cancelledBy   || "-",
-    "Created By": item.createdBy?.name || item.createdBy?.username || "-",
+      "Advance Amount":     item.service?.advanceAmount || 0,
+
+      "Advance Date": item.service?.advanceDate
+  ? new Date(item.service.advanceDate).toLocaleDateString("en-IN")
+  : "-",
+      "Margin":             item.service?.margin || 0,
+      "Remarks":            item.service?.remarks || "-",
+      // ✅ NEW
+      "Insta Follow":       item.service?.instaFollowers || "-",
+      "Google Review":      item.service?.googleReview || "-",
+      "Cancel Remarks":     item.cancelRemarks || "-",
+      "Cancelled By":       item.cancelledBy   || "-",
+      "Created By":         item.createdBy?.name || item.createdBy?.username || "-",
+      "Service Rep":        item.service?.serviceRep || "-",   // ✅ ADD
     }));
 
     const ws = XLSX.utils.json_to_sheet(rows);
@@ -105,7 +113,8 @@ const AllReportPage = () => {
       { wch: 17 }, { wch: 12 }, { wch: 16 }, { wch: 14 }, { wch: 16 },
       { wch: 12 }, { wch: 14 }, { wch: 12 }, { wch: 10 }, { wch: 13 },
       { wch: 14 }, { wch: 13 }, { wch: 14 }, { wch: 28 }, { wch: 28 },
-  { wch: 22 }, { wch: 22 }, { wch: 13 }, { wch: 12 }, { wch: 14 },
+      { wch: 22 }, { wch: 22 }, { wch: 13 }, { wch: 12 }, { wch: 14 },
+      { wch: 14 }, { wch: 14 }, { wch: 14 }, 
     ];
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "All Reports");
@@ -117,24 +126,38 @@ const AllReportPage = () => {
     if (s === "Pending")         return { background: "#fef3c7", color: "#92400e", padding: "2px 8px", borderRadius: "12px", fontSize: "11px", fontWeight: 600, whiteSpace: "nowrap" };
     if (s === "Received")        return { background: "#dbeafe", color: "#1e40af", padding: "2px 8px", borderRadius: "12px", fontSize: "11px", fontWeight: 600, whiteSpace: "nowrap" };
     if (s === "Delivered NR/NA") return { background: "#fee2e2", color: "#991b1b", padding: "2px 8px", borderRadius: "12px", fontSize: "11px", fontWeight: 600, whiteSpace: "nowrap" };
-   if (s === "Cancelled") return { background: "#fee2e2", color: "#991b1b", padding: "2px 8px", borderRadius: "12px", fontSize: "11px", fontWeight: 600, whiteSpace: "nowrap" };
-    return { background: "#f3f4f6", color: "#374151", padding: "2px 8px", borderRadius: "12px", fontSize: "11px", fontWeight: 600 };}
+    if (s === "Cancelled")       return { background: "#fee2e2", color: "#991b1b", padding: "2px 8px", borderRadius: "12px", fontSize: "11px", fontWeight: 600, whiteSpace: "nowrap" };
+    return { background: "#f3f4f6", color: "#374151", padding: "2px 8px", borderRadius: "12px", fontSize: "11px", fontWeight: 600 };
+  };
+
+  // ✅ Insta / Google badge helper
+  const socialBadge = (val) => {
+    if (!val || val === "-") return <span style={{ color: "#94a3b8" }}>—</span>;
+    if (val === "Already Done")
+      return <span style={{ background: "#dbeafe", color: "#1e40af", padding: "2px 7px", borderRadius: 10, fontSize: 11, fontWeight: 600 }}>✅ Already Done</span>;
+    if (val === "Yes")
+      return <span style={{ background: "#d1fae5", color: "#065f46", padding: "2px 7px", borderRadius: 10, fontSize: 11, fontWeight: 600 }}>👍 Yes</span>;
+    if (val === "No")
+      return <span style={{ background: "#fee2e2", color: "#991b1b", padding: "2px 7px", borderRadius: 10, fontSize: 11, fontWeight: 600 }}>❌ No</span>;
+    return <span style={{ fontSize: 11 }}>{val}</span>;
+  };
 
   const totalService = filteredData.reduce((s, i) => s + Number(i.service?.serviceCharge || 0), 0);
   const totalSpare   = filteredData.reduce((s, i) => s + Number(i.service?.spareCharge || 0), 0);
   const totalAmount  = totalService + totalSpare;
 
-  // TABLE HEADERS - 25 columns total
+  // ✅ Updated headers — added Insta & Google
   const headers = [
     "SL", "Date", "Job No", "Name", "Contact", "Alt Contact",
     "Make", "Model", "IMEI", "Warranty", "Status",
     "Engineer", "Dealer", "Drawer",
     "Svc ₹", "Spare ₹", "Total ₹", "Payment",
     "Problems", "Physical Cond.", "Accessories",
-    "Repair Date", "Delivery Date", "Advance ₹", "Margin ₹", "Remarks", "Created By"
+    "Repair Date", "Delivery Date", "Advance ₹","Adv. Date", "Margin ₹", "Remarks",
+    "📸 Insta", "⭐ Google", // ✅ NEW
+     "Service Rep", 
+    "Created By"
   ];
-  // headers.length = 25
-  // Svc ₹ is index 14 (0-based), so colSpan for footer label = 14
 
   return (
     <div style={{ minHeight: "100vh", background: "#f1f5f9", padding: "20px" }}>
@@ -222,6 +245,8 @@ const AllReportPage = () => {
           { label: "Service Charge", value: `₹${totalService.toLocaleString("en-IN")}`, color: "#7c3aed" },
           { label: "Spare Charge",   value: `₹${totalSpare.toLocaleString("en-IN")}`,   color: "#db2777" },
           { label: "Total Amount",   value: `₹${totalAmount.toLocaleString("en-IN")}`,  color: "#059669" },
+         { label: "📸 Instagram", value: filteredData.filter(i => i.service?.instaFollowers === "Yes").length, color: "#e11d48" },
+{ label: "⭐ Google Review", value: filteredData.filter(i => i.service?.googleReview === "Yes").length, color: "#d97706" },
         ].map((s, i) => (
           <div key={i} style={{ background: "#fff", borderRadius: "10px", padding: "10px 18px", boxShadow: "0 1px 4px rgba(0,0,0,0.07)", minWidth: "140px" }}>
             <div style={{ fontSize: "11px", color: "#64748b", fontWeight: 600 }}>{s.label}</div>
@@ -239,7 +264,6 @@ const AllReportPage = () => {
         <div style={{ overflowX: "auto", maxHeight: "62vh", overflowY: "auto" }}>
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "12px" }}>
 
-            {/* ── THEAD: 25 columns ── */}
             <thead style={{ position: "sticky", top: 0, zIndex: 10 }}>
               <tr style={{ background: "#1e293b", color: "#fff" }}>
                 {headers.map((h, i) => (
@@ -258,89 +282,68 @@ const AllReportPage = () => {
                   const rowBg = index % 2 === 0 ? "#fff" : "#f8fafc";
                   const td    = { padding: "8px 8px", borderBottom: "1px solid #e2e8f0", borderRight: "1px solid #e2e8f0", whiteSpace: "nowrap", color: "#1e293b" };
                   return (
-                    <tr key={index} 
-  style={{ background: rowBg, cursor: "pointer" }}
-  onDoubleClick={() => navigate(`/jobsheet/${item._id}`)}
-  onMouseEnter={e => e.currentTarget.style.background = "#eff6ff"}
-  onMouseLeave={e => e.currentTarget.style.background = rowBg}>
+                    <tr key={index}
+                      style={{ background: rowBg, cursor: "pointer" }}
+                      onDoubleClick={() => navigate(`/jobsheet/${item._id}`)}
+                      onMouseEnter={e => e.currentTarget.style.background = "#eff6ff"}
+                      onMouseLeave={e => e.currentTarget.style.background = rowBg}>
 
-                      {/* 1. SL */}
                       <td style={{ ...td, color: "#64748b" }}>{index + 1}</td>
-                      {/* 2. Date */}
                       <td style={{ ...td, color: "#0369a1", fontWeight: 600 }}>
                         {new Date(item.createdAt).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "2-digit" })}
                       </td>
-                      {/* 3. Job No */}
                       <td style={{ ...td, fontWeight: 700, color: "#2563eb" }}>{item.jobSheetNo || "-"}</td>
-                      {/* 4. Name */}
                       <td style={{ ...td, fontWeight: 600 }}>{item.customer?.name || "-"}</td>
-                      {/* 5. Contact */}
                       <td style={td}>{item.customer?.contact || "-"}</td>
-                      {/* 6. Alt Contact */}
                       <td style={td}>{item.customer?.altContact || "-"}</td>
-                      {/* 7. Make */}
                       <td style={td}>{item.device?.make || "-"}</td>
-                      {/* 8. Model */}
                       <td style={td}>{item.device?.model || "-"}</td>
-                      {/* 9. IMEI */}
                       <td style={td}>{item.device?.imei || "-"}</td>
-                      {/* 10. Warranty */}
                       <td style={td}>{item.device?.warranty || "-"}</td>
-{/* 11. Status */}
-<td style={td}>
-  <span style={getStatusStyle(item.device?.mobileStatus)}>
-    {item.device?.mobileStatus || "-"}
-  </span>
-  {item.isCancelled && item.cancelRemarks && (
-    <div style={{ fontSize: 10, color: "#dc3545", marginTop: 3, whiteSpace: "normal", maxWidth: 120 }}>
-      📝 {item.cancelRemarks}
-    </div>
-  )}
-</td>
-                      
-                      {/* 12. Engineer */}
+                      <td style={td}>
+                        <span style={getStatusStyle(item.device?.mobileStatus)}>
+                          {item.device?.mobileStatus || "-"}
+                        </span>
+                        {item.isCancelled && item.cancelRemarks && (
+                          <div style={{ fontSize: 10, color: "#dc3545", marginTop: 3, whiteSpace: "normal", maxWidth: 120 }}>
+                            📝 {item.cancelRemarks}
+                          </div>
+                        )}
+                      </td>
                       <td style={td}>{item.service?.engineer || "-"}</td>
-                      {/* 13. Dealer */}
                       <td style={td}>{item.service?.dealer || "-"}</td>
-                      {/* 14. Drawer */}
                       <td style={td}>{item.service?.drawer || "-"}</td>
-                      {/* 15. Svc ₹ */}
                       <td style={{ ...td, color: "#7c3aed", fontWeight: 600 }}>₹{svc.toLocaleString("en-IN")}</td>
-                      {/* 16. Spare ₹ */}
                       <td style={{ ...td, color: "#db2777", fontWeight: 600 }}>₹{spare.toLocaleString("en-IN")}</td>
-                      {/* 17. Total ₹ */}
                       <td style={{ ...td, color: "#059669", fontWeight: 700 }}>₹{(svc + spare).toLocaleString("en-IN")}</td>
-                      {/* 18. Payment */}
                       <td style={td}>{item.service?.paymentMode || "-"}</td>
-                      {/* 19. Problems */}
                       <td style={{ ...td, maxWidth: "160px", whiteSpace: "normal", wordBreak: "break-word" }}>{item.visualIssues?.filter(Boolean).join(", ") || "-"}</td>
-                      {/* 20. Physical Cond. */}
                       <td style={{ ...td, maxWidth: "160px", whiteSpace: "normal", wordBreak: "break-word" }}>{item.physicalCondition?.join(", ") || "-"}</td>
-                      {/* 21. Accessories */}
                       <td style={{ ...td, maxWidth: "120px", whiteSpace: "normal", wordBreak: "break-word" }}>{item.accessories?.join(", ") || "-"}</td>
-                      {/* 22. Repair Date */}
                       <td style={td}>{item.service?.repairDate ? new Date(item.service.repairDate).toLocaleDateString("en-IN") : "-"}</td>
-                      {/* 23. Delivery Date */}
-                      
-                      
-                      
                       <td style={td}>{item.service?.deliveryDate ? new Date(item.service.deliveryDate).toLocaleDateString("en-IN") : "-"}</td>
+                      <td style={{ ...td, color: "#0369a1", fontWeight: 600 }}>
+                        {item.service?.advanceAmount ? `₹${Number(item.service.advanceAmount).toLocaleString("en-IN")}` : "-"}
+                      </td>
 
-                      {/* 24. Advance */}
-<td style={{ ...td, color: "#0369a1", fontWeight: 600 }}>
-  {item.service?.advanceAmount ? `₹${Number(item.service.advanceAmount).toLocaleString("en-IN")}` : "-"}
+
+                      <td style={{ ...td, color: "#0369a1", fontSize: 11 }}>
+  {item.service?.advanceDate
+    ? new Date(item.service.advanceDate).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "2-digit" })
+    : "-"}
 </td>
-{/* 25. Margin */}
-<td style={{ ...td, color: "#059669", fontWeight: 600 }}>
-  {item.service?.margin ? `₹${Number(item.service.margin).toLocaleString("en-IN")}` : "-"}
-</td>
-                      {/* 24. Remarks */}
-
-
+                      <td style={{ ...td, color: "#059669", fontWeight: 600 }}>
+                        {item.service?.margin ? `₹${Number(item.service.margin).toLocaleString("en-IN")}` : "-"}
+                      </td>
                       <td style={{ ...td, maxWidth: "140px", whiteSpace: "normal", wordBreak: "break-word" }}>{item.service?.remarks || "-"}</td>
-                      {/* 25. Created By */}
-                 {/* 25. Created By */}
-<td style={td}>{item.createdBy?.name || item.createdBy?.username || "-"}</td>
+                      {/* ✅ NEW: Insta & Google columns */}
+                      <td style={{ ...td, textAlign: "center" }}>{socialBadge(item.service?.instaFollowers)}</td>
+                      <td style={{ ...td, textAlign: "center" }}>{socialBadge(item.service?.googleReview)}</td>
+
+                       <td style={td}>{item.service?.serviceRep || "-"}</td>
+                      <td style={td}>{item.createdBy?.name || item.createdBy?.username || "-"}</td>
+                     
+
                     </tr>
                   );
                 })
@@ -349,8 +352,7 @@ const AllReportPage = () => {
               )}
             </tbody>
 
-            {/* FOOTER TOTALS
-                Svc ₹ = col index 14 (0-based) → colSpan = 14 to cover cols 0-13 */}
+            {/* FOOTER — colSpan 14 covers cols 0-13, then Svc/Spare/Total at 14/15/16 */}
             {filteredData.length > 0 && (
               <tfoot>
                 <tr style={{ background: "#1e293b", color: "#fff", fontWeight: 700 }}>
@@ -360,7 +362,7 @@ const AllReportPage = () => {
                   <td style={{ padding: "10px 8px", color: "#c4b5fd" }}>₹{totalService.toLocaleString("en-IN")}</td>
                   <td style={{ padding: "10px 8px", color: "#f9a8d4" }}>₹{totalSpare.toLocaleString("en-IN")}</td>
                   <td style={{ padding: "10px 8px", color: "#6ee7b7" }}>₹{totalAmount.toLocaleString("en-IN")}</td>
-                  <td colSpan="10"></td>
+                  <td colSpan="14"></td>
                 </tr>
               </tfoot>
             )}

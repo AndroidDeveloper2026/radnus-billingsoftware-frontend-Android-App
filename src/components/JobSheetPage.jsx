@@ -148,7 +148,12 @@ const validateField = (name, value) => {
   const [idProofImage, setIdProofImage] = useState(null);
   const [idProofPreview, setIdProofPreview] = useState(null);
 const [serviceRep, setServiceRep] = useState("");
+const [advanceDate, setAdvanceDate] = useState("");
 const [salesRepList, setSalesRepList] = useState([]);
+
+
+const [instaFollowers, setInstaFollowers] = useState("");
+const [googleReview, setGoogleReview]     = useState("");
   /* ================= CHECKBOX ARRAYS ================= */
   const [physicalCondition, setPhysicalCondition] = useState([]);
   const [accessories, setAccessories] = useState([]);
@@ -312,86 +317,67 @@ const handleCancel = async () => {
 };
   /* ================= UPDATE ================= */
 const handleUpdate = async () => {
-    // ✅ NEW: inline validation
-    if (!validateAll()) {
-      window.scrollTo({ top: 0, behavior: "smooth" });
-      return;
+  console.log("=== DEBUG ===");
+  console.log("advanceDate:", advanceDate);
+  console.log("advanceAmount:", advanceAmount);
+
+  if (!validateAll()) { window.scrollTo({ top: 0, behavior: "smooth" }); return; }
+  if (repairDate && deliveryDate && new Date(deliveryDate) < new Date(repairDate)) {
+    alert("⚠️ Delivery Date cannot be before Repair Date"); return;
+  }
+
+  try {
+    const formData = new FormData();
+    formData.append("jobSheetNo", jobSheetNo);
+    formData.append("customer", JSON.stringify({ name: customerName, contact, altContact, address, email }));
+    formData.append("device", JSON.stringify({ make: make === "__custom" ? customMake : make, model: model === "__custom" ? customModel : model, imei, warranty, pattern, mobileStatus }));
+    formData.append("physicalCondition", JSON.stringify(physicalCondition));
+    formData.append("accessories", JSON.stringify(accessories));
+    formData.append("visualIssues", JSON.stringify(visualIssues.filter(Boolean)));
+    formData.append("service", JSON.stringify({
+      engineer, dealer, drawer, serviceRep,
+      serviceCharge: Number(serviceCharge || 0),
+      spareCharge:   Number(spareCharge   || 0),
+      estimate, paymentMode, repairDate, deliveryDate,
+      instaFollowers, googleReview,
+      advanceAmount: Number(advanceAmount || 0),
+      advanceDate,   // ✅ இது already இருக்கு
+      margin:        Number(margin || 0),
+      remarks,
+    }));
+    formData.append("spareItems", JSON.stringify(spareItems));
+    formData.append("idProofType", idProofType);
+    if (idProofImage && typeof idProofImage !== "string") {
+      formData.append("idProofImage", idProofImage);
     }
-    // ✅ ORIGINAL: date validation still runs
-    if (repairDate && deliveryDate && new Date(deliveryDate) < new Date(repairDate)) {
-      alert("⚠️ Delivery Date cannot be before Repair Date");
-      return;
+
+    const res = await axios.put(
+      `${API}/api/jobsheets/${editData._id}`,
+      formData,
+      { headers: { "Content-Type": "multipart/form-data" } }
+    );
+
+    // ✅ KEY FIX — response data-வை localEditData-க்கு set பண்ணு
+    // இதுல advanceDate updated value DB-லிருந்து வரும்
+    const updatedJob = res.data?.job || res.data;
+    setLocalEditData(updatedJob);
+
+    // ✅ advanceDate response-லிருந்து re-set பண்ணு
+    if (updatedJob?.service?.advanceDate) {
+      setAdvanceDate(updatedJob.service.advanceDate.slice(0, 10));
     }
-    try {
-      const formData = new FormData();
 
-      formData.append("jobSheetNo", jobSheetNo);
+    alert("Job Sheet Updated ✅");
 
-      formData.append(
-        "customer",
-        JSON.stringify({ name: customerName, contact, altContact, address, email })
-      );
-
-      formData.append(
-        "device",
-        JSON.stringify({
-          make: make === "__custom" ? customMake : make,
-          model: model === "__custom" ? customModel : model,
-          imei,
-          warranty,
-          pattern,
-          mobileStatus,
-        })
-      );
-
-      formData.append("physicalCondition", JSON.stringify(physicalCondition));
-      formData.append("accessories", JSON.stringify(accessories));
-      formData.append("visualIssues", JSON.stringify(visualIssues.filter(Boolean)));
-
-      formData.append(
-        "service",
-       JSON.stringify({
-          engineer,
-          dealer,
-          drawer,
-           serviceRep,
-          serviceCharge: Number(serviceCharge || 0),
-          spareCharge: Number(spareCharge || 0),
-          estimate,
-          paymentMode,
-          repairDate,
-          deliveryDate,
-          remarks,
-          advanceAmount: Number(advanceAmount || 0),
-          margin: Number(margin || 0),
-        })
-      );
-
-      // ✅ BUG FIX — spareItems update ல் missing ஆச்சு
-      formData.append("spareItems", JSON.stringify(spareItems));
-
-      formData.append("idProofType", idProofType);
-
-      if (idProofImage && typeof idProofImage !== "string") {
-        formData.append("idProofImage", idProofImage);
-      }
-
-      await axios.put(
-        `${API}/api/jobsheets/${editData._id}`,
-        formData,
-        { headers: { "Content-Type": "multipart/form-data" } }
-      );
-
-      alert("Job Sheet Updated ✅");
-    } catch (err) {
-      console.error(err);
-      alert("Update failed ❌");
-    }
-  };
+  } catch (err) {
+    console.error(err);
+    alert("Update failed ❌");
+  }
+};
 
   /* ================= SAVE ================= */
 
- const handleSave = async () => {
+const handleSave = async () => {
 
     // 🛑 DOUBLE CLICK STOP
     if (saving) return;
@@ -419,7 +405,16 @@ const handleUpdate = async () => {
       formData.append("physicalCondition", JSON.stringify(physicalCondition));
       formData.append("accessories", JSON.stringify(accessories));
       formData.append("visualIssues", JSON.stringify(visualIssues.filter(Boolean)));
-    formData.append("service", JSON.stringify({ engineer, dealer, drawer,  serviceRep,serviceCharge: Number(serviceCharge || 0), spareCharge: Number(spareCharge || 0), estimate, paymentMode, repairDate, deliveryDate, remarks, advanceAmount: Number(advanceAmount || 0), margin: Number(margin || 0) }));
+      formData.append("service", JSON.stringify({ 
+        engineer, dealer, drawer, serviceRep,
+        instaFollowers,
+        googleReview,advanceDate,
+        serviceCharge: Number(serviceCharge || 0), 
+        spareCharge: Number(spareCharge || 0), 
+        estimate, paymentMode, repairDate, deliveryDate, remarks, 
+        advanceAmount: Number(advanceAmount || 0), 
+        margin: Number(margin || 0) 
+      }));
       formData.append("spareItems", JSON.stringify(spareItems));
       formData.append("idProofType", idProofType);
       if (idProofImage) formData.append("idProofImage", idProofImage);
@@ -440,7 +435,7 @@ const handleUpdate = async () => {
     } finally {
       setSaving(false);
     }
-  };   // ← handleSave ends here
+  }; // ← handleSave ends here
 
   /* ================= NEW ================= */
 
@@ -464,12 +459,13 @@ setServiceRep("");
     setIdProofImage(null);
     setIdProofPreview(null);
     setMobileStatus("");
-
+setInstaFollowers("");
+setGoogleReview("");
     setPhysicalCondition([]);
     setAccessories([]);
     setVisualIssues([""]);
     setCustomFaults({}); 
-
+setAdvanceDate("");
     setEngineer("");
     setDealer("");
     setDrawer("");
@@ -499,59 +495,74 @@ setMargin("");
  };
 
   /* ================= EDIT DATA ================= */
+useEffect(() => {
+  if (!isEdit || !editData) return;
 
-  useEffect(() => {
-    if (!isEdit || !editData) return;
-setCustomFaults({}); 
-    // CUSTOMER
-    setCustomerName(editData.customer?.name || "");
-    setContact(editData.customer?.contact || "");
-    setAltContact(editData.customer?.altContact || "");
-    setAddress(editData.customer?.address || "");
-    setEmail(editData.customer?.email || "");
-setServiceRep(editData.service?.serviceRep || "");
+  setCustomerName(editData.customer?.name || "");
+  setContact(editData.customer?.contact || "");
+  setAltContact(editData.customer?.altContact || "");
+  setAddress(editData.customer?.address || "");
+  setEmail(editData.customer?.email || "");
+  setServiceRep(editData.service?.serviceRep || "");
+  setInstaFollowers(editData.service?.instaFollowers || "");
+  setGoogleReview(editData.service?.googleReview || "");
+  setMake(editData.device?.make || "");
+  setModel(editData.device?.model || "");
+  setImei(editData.device?.imei || "");
+  setWarranty(editData.device?.warranty || "");
+  setPattern(editData.device?.pattern || "");
+  setIdProofType(editData.device?.idProofType || "");
+  setIdProofPreview(editData.idProofImage || "");
+  setMobileStatus(editData.device?.mobileStatus || "");
 
-    // DEVICE
-    setMake(editData.device?.make || "");
-    setModel(editData.device?.model || "");
-    setImei(editData.device?.imei || "");
-    setWarranty(editData.device?.warranty || "");
-    setPattern(editData.device?.pattern || "");
-    setIdProofType(editData.device?.idProofType || "");
-    setIdProofPreview(editData.idProofImage || "");
-    setMobileStatus(editData.device?.mobileStatus || "");
-
-    // CHECKBOX ARRAYS
-    setPhysicalCondition(editData.physicalCondition || []);
-    setAccessories(editData.accessories || []);
-  const savedIssues = editData.visualIssues?.length ? editData.visualIssues : [""];
-setVisualIssues(savedIssues);
-
-const rebuilt = {};
-savedIssues.forEach((issue, i) => {
-  if (issue && !faultList.some(f => f.name.toLowerCase() === issue.toLowerCase())) {
-    rebuilt[i] = issue;
+  // ✅ KEY FIX: advanceDate — ISO string-ஐ "YYYY-MM-DD" format-ல் set பண்ணு
+  const rawAdvDate = editData.service?.advanceDate;
+  if (rawAdvDate) {
+    const formatted = new Date(rawAdvDate).toISOString().split("T")[0];
+    setAdvanceDate(formatted);
+  } else {
+    setAdvanceDate("");
   }
-});
-setCustomFaults(rebuilt);
 
-    // SERVICE
-    setEngineer(editData.service?.engineer || "");
-    setDealer(editData.service?.dealer || "");
-    setDrawer(editData.service?.drawer || "");
-    setServiceCharge(editData.service?.serviceCharge || "");
-    setSpareCharge(editData.service?.spareCharge || "");
-    setSpareItems(editData.spareItems || []);
-    setEstimate(editData.service?.estimate || "");
-    setPaymentMode(editData.service?.paymentMode || "");
-    setRepairDate(editData.service?.repairDate?.slice(0, 10) || today);
-    setDeliveryDate(editData.service?.deliveryDate?.slice(0, 10) || "");
-    setRemarks(editData.service?.remarks || "");
-    setAdvanceAmount(editData.service?.advanceAmount || "");
-setMargin(editData.service?.margin || "");
+  setPhysicalCondition(editData.physicalCondition || []);
+  setAccessories(editData.accessories || []);
+  setEngineer(editData.service?.engineer || "");
+  setDealer(editData.service?.dealer || "");
+  setDrawer(editData.service?.drawer || "");
+  setServiceCharge(editData.service?.serviceCharge || "");
+  setSpareCharge(editData.service?.spareCharge || "");
+  setSpareItems(editData.spareItems || []);
+  setEstimate(editData.service?.estimate || "");
+  setPaymentMode(editData.service?.paymentMode || "");
+  setRepairDate(editData.service?.repairDate?.slice(0, 10) || today);
+  setDeliveryDate(editData.service?.deliveryDate?.slice(0, 10) || "");
+  setRemarks(editData.service?.remarks || "");
+  setAdvanceAmount(editData.service?.advanceAmount || "");
+  setMargin(editData.service?.margin || "");
 
-  }, [isEdit, editData,faultList]);
+}, [isEdit, editData]);
 
+
+
+
+
+
+// Visual issues மட்டும் faultList depend பண்ணுது
+useEffect(() => {
+  if (!isEdit || !editData || !faultList.length) return;
+
+  const savedIssues = editData.visualIssues?.length ? editData.visualIssues : [""];
+  setVisualIssues(savedIssues);
+
+  const rebuilt = {};
+  savedIssues.forEach((issue, i) => {
+    if (issue && !faultList.some(f => f.name.toLowerCase() === issue.toLowerCase())) {
+      rebuilt[i] = issue;
+    }
+  });
+  setCustomFaults(rebuilt);
+
+}, [isEdit, editData, faultList]); // ← இங்க மட்டும் faultList
 
 const [searching, setSearching] = useState(false);
 
@@ -842,13 +853,15 @@ const getWorkloadBadge = (engName) => {
   type="name"
   value={customerName}
   onChange={setCustomerName}
-  onSelect={(customer) => {
-    setCustomerName(customer.name || "");
-    setContact(customer.contact || "");
-    setAltContact(customer.altContact || "");
-    setAddress(customer.address || "");
-    setEmail(customer.email || "");
-  }}
+onSelect={(customer) => {
+  setCustomerName(customer.name || "");
+  setContact(customer.contact || "");
+  setAltContact(customer.altContact || "");
+  setAddress(customer.address || "");
+  setEmail(customer.email || "");
+  setInstaFollowers(customer.instaFollowers === "Already Done" ? "Already Done" : "");
+  setGoogleReview(customer.googleReview === "Already Done" ? "Already Done" : "");
+}}
   placeholder="Customer Name *"
   className={`form-control form-control-sm ${
     touched.customerName && formErrors.customerName ? "is-invalid" :
@@ -899,13 +912,15 @@ const getWorkloadBadge = (engName) => {
     value={contact}
     onChange={setContact}
     filterNumbers={true}
-    onSelect={(customer) => {
-      setCustomerName(customer.name || "");
-      setContact(customer.contact || "");
-      setAltContact(customer.altContact || "");
-      setAddress(customer.address || "");
-      setEmail(customer.email || "");
-    }}
+onSelect={(customer) => {
+  setCustomerName(customer.name || "");
+  setContact(customer.contact || "");
+  setAltContact(customer.altContact || "");
+  setAddress(customer.address || "");
+  setEmail(customer.email || "");
+  setInstaFollowers(customer.instaFollowers === "Already Done" ? "Already Done" : "");
+  setGoogleReview(customer.googleReview === "Already Done" ? "Already Done" : "");
+}}
     placeholder="Contact No *"
     maxLength={10}
     className={`form-control form-control-sm ${
@@ -1268,38 +1283,48 @@ const getWorkloadBadge = (engName) => {
                 </div>
               </div>
 
-{/* ROW 3 – Advance, Margin, Service Rep */}
-<div className="row g-2 mt-2">
-  <div className="col-md-3">
-    <label className="form-label small fw-semibold mb-1">Advance Amount</label>
+{/* ROW 3 – Advance, Advance Date, Margin, Service Rep */}
+{/* ROW 3 – Adv.Amount | Adv.Date | Margin | S.Rep */}
+<div className="row g-2 mt-2 flex-nowrap align-items-end">
+
+  <div className="col">
     <input
       type="text"
       className="form-control form-control-sm"
-      placeholder="Advance ₹"
+      placeholder="Adv. Amount ₹"
       value={advanceAmount}
       onChange={(e) => setAdvanceAmount(onlyNumbers(e.target.value))}
     />
   </div>
-  <div className="col-md-3">
-    <label className="form-label small fw-semibold mb-1">Margin</label>
-  <input
-  type="text"
-  className="form-control form-control-sm"
-  placeholder="Margin ₹"
-  value={margin}
-  readOnly  // ← இதை add பண்ணு
-  style={{ background: "#f8f9fa", cursor: "not-allowed" }}
-  onChange={(e) => setMargin(onlyNumbers(e.target.value))}
-/>
+
+  <div className="col">
+    <input
+      type="date"
+      className="form-control form-control-sm"
+      placeholder="Adv. Date"
+      value={advanceDate}
+      onChange={(e) => setAdvanceDate(e.target.value)}
+    />
   </div>
-  <div className="col-md-6">
-    <label className="form-label small fw-semibold mb-1">Service Rep</label>
+
+  <div className="col">
+    <input
+      type="text"
+      className="form-control form-control-sm"
+      placeholder="Margin ₹"
+      value={margin}
+      readOnly
+      style={{ background: "#f8f9fa", cursor: "not-allowed" }}
+    />
+  </div>
+
+  <div className="col-3" style={{ marginLeft: "auto" }}>
     <select
       className="form-select form-select-sm"
       value={serviceRep}
       onChange={e => setServiceRep(e.target.value)}
     >
-      <option value="">Select Service Rep</option>
+      <option value="">Sales Rep</option>
       {salesRepList.map((rep, i) => (
         <option key={i} value={rep.name || rep}>
           {rep.name || rep}
@@ -1307,11 +1332,12 @@ const getWorkloadBadge = (engName) => {
       ))}
     </select>
   </div>
+
 </div>
 
-{/* ROW 4 – Repair Date, Delivery Date */}
+{/* ROW 4 – Repair Date, Delivery Date, Insta, Google */}
 <div className="row g-2 mt-2">
-  <div className="col-md-6">
+  <div className="col-md-3">
     <label className="form-label small fw-semibold mb-1">Repair Date</label>
     <input
       type="date"
@@ -1320,7 +1346,7 @@ const getWorkloadBadge = (engName) => {
       onChange={(e) => setRepairDate(e.target.value)}
     />
   </div>
-  <div className="col-md-6">
+  <div className="col-md-3">
     <label className="form-label small fw-semibold mb-1">Delivery Date</label>
     <input
       type="date"
@@ -1329,7 +1355,61 @@ const getWorkloadBadge = (engName) => {
       onChange={(e) => setDeliveryDate(e.target.value)}
     />
   </div>
+  <div className="col-md-3">
+    <label className="form-label small fw-semibold mb-1">📸Insta Follow</label>
+    <select
+      className="form-select form-select-sm"
+      value={instaFollowers}
+      onChange={(e) => setInstaFollowers(e.target.value)}
+    >
+      <option value="">Select</option>
+      <option value="Yes">Yes</option>
+      <option value="No">No</option>
+      <option value="Already Done">Already Done</option>
+    </select>
+  </div>
+  <div className="col-md-3">
+    <label className="form-label small fw-semibold mb-1">⭐ Google Review</label>
+    <select
+      className="form-select form-select-sm"
+      value={googleReview}
+      onChange={(e) => setGoogleReview(e.target.value)}
+    >
+      <option value="">Select</option>
+      <option value="Yes">Yes</option>
+      <option value="No">No</option>
+      <option value="Already Done">Already Done</option>
+    </select>
+  </div>
 </div>
+
+
+
+
+
+
+ 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
               {/* ROW 4 – Remarks */}
               <div className="row g-2 mt-2">
