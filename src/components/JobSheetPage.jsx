@@ -1324,7 +1324,7 @@ onSelect={(customer) => {
       value={serviceRep}
       onChange={e => setServiceRep(e.target.value)}
     >
-      <option value="">Sales Rep</option>
+      <option value="">Service Rep</option>
       {salesRepList.map((rep, i) => (
         <option key={i} value={rep.name || rep}>
           {rep.name || rep}
