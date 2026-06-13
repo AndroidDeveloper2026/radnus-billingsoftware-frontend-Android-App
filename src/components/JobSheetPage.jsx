@@ -1529,8 +1529,7 @@ onSelect={(customer) => {
               {saving ? "Saving..." : "Save"}
             </button>
           )}
-{/* CANCEL — New entry la மட்டும் (saved jobsheet) or edit mode */}
-{isEdit && !localEditData?.isCancelled && !localEditData?.isInvoiced && (
+{isEdit && localEditData && !localEditData?.isCancelled && (
   <button
     className="btn btn-outline-danger btn-sm"
     onClick={() => setShowCancelModal(true)}
