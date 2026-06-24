@@ -5,6 +5,8 @@ import { useNavigate } from "react-router-dom";
 const ReportPage = () => {
   const navigate = useNavigate();
   const API = import.meta.env.VITE_API_URL;
+  const user = JSON.parse(sessionStorage.getItem("user"));
+  const role = user?.role;
 
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate]     = useState("");
@@ -21,13 +23,13 @@ const ReportPage = () => {
     try {
       const res = await axios.get(`${API}/api/jobsheets/filter`, { params: { fromDate, toDate, engineer, dealer } });
       const data = res.data;
-    setCounts({
-  received:  data.filter(d => d.device?.mobileStatus === "Received").length,
-  pending:   data.filter(d => d.device?.mobileStatus === "Pending").length,   // NEW
-  repaired:  data.filter(d => d.device?.mobileStatus === "Repaired").length,  // FIXED
-  delivered: data.filter(d => d.device?.mobileStatus === "Delivered").length,
-  nrna:      data.filter(d => d.device?.mobileStatus === "Delivered NR/NA").length,
-});
+      setCounts({
+        received:  data.filter(d => d.device?.mobileStatus === "Received").length,
+        pending:   data.filter(d => d.device?.mobileStatus === "Pending").length,
+        repaired:  data.filter(d => d.device?.mobileStatus === "Repaired").length,
+        delivered: data.filter(d => d.device?.mobileStatus === "Delivered").length,
+        nrna:      data.filter(d => d.device?.mobileStatus === "Delivered NR/NA").length,
+      });
     } catch { alert("Failed ❌"); }
   };
 
@@ -105,9 +107,9 @@ const ReportPage = () => {
         <div style={{ display: "grid", gridTemplateColumns: "repeat(5,1fr)", gap: "14px", marginBottom: "20px" }}>
           {[
             { label: "Received",  value: counts.received,  color: "#3b82f6", bg: "#eff6ff", icon: "📥" },
-           { label: "Pending",   value: counts.pending,   color: "#f59e0b", bg: "#fffbeb",  icon: "🔧" },
+            { label: "Pending",   value: counts.pending,   color: "#f59e0b", bg: "#fffbeb", icon: "🔧" },
             { label: "Delivered", value: counts.delivered, color: "#10b981", bg: "#f0fdf4", icon: "✅" },
-            { label: "Repaired",  value: counts.repaired,  color: "#10b981", bg: "#f0fdf4",  icon: "✅" },
+            { label: "Repaired",  value: counts.repaired,  color: "#10b981", bg: "#f0fdf4", icon: "✅" },
             { label: "NR / NA",   value: counts.nrna,      color: "#ef4444", bg: "#fef2f2", icon: "❌" },
           ].map((c, i) => (
             <div key={i} style={{ background: c.bg, borderRadius: "12px", padding: "16px 18px", border: `1.5px solid ${c.color}22`, boxShadow: "0 1px 4px rgba(0,0,0,0.05)" }}>
@@ -118,65 +120,81 @@ const ReportPage = () => {
           ))}
         </div>
 
-       
-
         {/* REPORT SECTIONS */}
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", marginBottom: "20px" }}>
 
-          {/* Status Reports */}
+          {/* Status Reports — both admin & user பார்க்கலாம் */}
           <div style={{ background: "#fff", borderRadius: "14px", padding: "20px", boxShadow: "0 1px 4px rgba(0,0,0,0.06)" }}>
             <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "14px" }}>
               <span style={{ fontSize: "18px" }}>📋</span>
               <span style={{ fontWeight: 800, color: "#0f172a", fontSize: "15px" }}>Status Reports</span>
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
-            {[
-  { label: "Pending",          path: "/pending-report" },
-  { label: "Repaired",         path: "/repaired-report" },
-  { label: "Delivered",        path: "/delivered-report" },
-  
-  { label: "Value Report",     path: "/value-report" },
-  { label: "Engineer Report",  path: "/engineer-report" },
-  { label: "Spare Report",     path: "/spare-report" },
-  { label: "Dealer Report",    path: "/dealer-report" },
-  { label: "Rebill Report",    path: "/rebill-report" },
-].map((b, i) => (
-  <button key={i} onClick={() => navigate(b.path)} className="rpt-btn">{b.label}</button>
-))}
-            </div>
-          </div>
-
-          {/* Daily Summary */}
-          <div style={{ background: "#fff", borderRadius: "14px", padding: "20px", boxShadow: "0 1px 4px rgba(0,0,0,0.06)" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "14px" }}>
-              <span style={{ fontSize: "18px" }}>📅</span>
-              <span style={{ fontWeight: 800, color: "#0f172a", fontSize: "15px" }}>Daily Summary</span>
-            </div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
               {[
-                { label: "Received",        path: "/received-report" },
-                  { label: "Pending",         path: "/pending-report" },
-
+                { label: "Pending",         path: "/pending-report" },
                 { label: "Repaired",        path: "/repaired-report" },
                 { label: "Delivered",       path: "/delivered-report" },
-                { label: "Delivered NR/NA", path: "/delivered-nrna-report" },
-
+                { label: "Value Report",    path: "/value-report" },
+                { label: "Engineer Report", path: "/engineer-report" },
+                { label: "Spare Report",    path: "/spare-report" },
+                { label: "Dealer Report",   path: "/dealer-report" },
+                { label: "Rebill Report",   path: "/rebill-report" },
               ].map((b, i) => (
                 <button key={i} onClick={() => navigate(b.path)} className="rpt-btn">{b.label}</button>
               ))}
             </div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", marginTop: "8px" }}>
-              {[
-                { label: "All Report",          path: "/all-report" },
-                { label: "All Engineer Report", path: "/engineer-all-report" },
-              ].map((b, i) => (
-                <button key={i} onClick={() => navigate(b.path)} className="rpt-btn-accent">{b.label}</button>
-              ))}
-            </div>
           </div>
 
+          {/* Daily Summary — admin மட்டும் */}
+          {role === "admin" && (
+            <div style={{ background: "#fff", borderRadius: "14px", padding: "20px", boxShadow: "0 1px 4px rgba(0,0,0,0.06)" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "14px" }}>
+                <span style={{ fontSize: "18px" }}>📅</span>
+                <span style={{ fontWeight: 800, color: "#0f172a", fontSize: "15px" }}>Daily Summary</span>
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
+                {[
+                  { label: "Received",        path: "/received-report" },
+                  { label: "Pending",         path: "/daily-pending-report" },
+                  { label: "Repaired",        path: "/daily-repaired-report" },
+                  { label: "Delivered",       path: "/daily-delivered-report" },
+                  { label: "Delivered NR/NA", path: "/delivered-nrna-report" },
+                  { label: "Service Rep Report",  path: "/salesrep-report" },
+                ].map((b, i) => (
+                  <button key={i} onClick={() => navigate(b.path)} className="rpt-btn">{b.label}</button>
+                ))}
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", marginTop: "8px" }}>
+                {[
+                  { label: "All Report",          path: "/all-report" },
+                  { label: "All Engineer Report", path: "/engineer-all-report" },
+                ].map((b, i) => (
+                  <button key={i} onClick={() => navigate(b.path)} className="rpt-btn-accent">{b.label}</button>
+                ))}
+              </div>
+            </div>
+          )}
+{/* Reports — user மட்டும் */}
+{role !== "admin" && (
+  <div style={{ background: "#fff", borderRadius: "14px", padding: "20px", boxShadow: "0 1px 4px rgba(0,0,0,0.06)" }}>
+    <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "14px" }}>
+      <span style={{ fontSize: "18px" }}>📂</span>
+      <span style={{ fontWeight: 800, color: "#0f172a", fontSize: "15px" }}>Reports</span>
+    </div>
+    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
+      {[
+        { label: "All Report",          path: "/all-report" },
+        { label: "All Engineer Report", path: "/engineer-all-report" },
+   { label: "My Report",  path: "/my-report" },
+      ].map((b, i) => (
+        <button key={i} onClick={() => navigate(b.path)} className="rpt-btn-accent">{b.label}</button>
+      ))}
+    </div>
+  </div>
+)}
         </div>
-         {/* ── STALE JOBS — LIGHT UI ── */}
+
+        {/* STALE JOBS */}
         <div style={{ background: "#fff", borderRadius: "14px", marginBottom: "20px", boxShadow: "0 1px 6px rgba(0,0,0,0.07)", overflow: "hidden", border: "1.5px solid #fcd34d" }}>
 
           {/* Panel Header */}
@@ -231,7 +249,6 @@ const ReportPage = () => {
                   const pct = Math.min((job.staleDays / maxDays) * 100, 100);
                   return (
                     <div key={job._id} className="stale-row" onClick={() => navigate(`/jobsheet/${job._id}`)}>
-                      {/* Top row */}
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "8px", marginBottom: "8px" }}>
                         <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
                           <span style={{ color: "#2563eb", fontWeight: 800, fontSize: "13px", minWidth: "58px" }}>{job.jobSheetNo}</span>
@@ -256,7 +273,6 @@ const ReportPage = () => {
                           <span style={{ color: "#94a3b8", fontSize: "11px" }}>→</span>
                         </div>
                       </div>
-                      {/* Progress bar */}
                       <div style={{ background: "#f1f5f9", borderRadius: "4px", height: "4px", overflow: "hidden" }}>
                         <div style={{ width: `${pct}%`, height: "100%", background: u.bar, borderRadius: "4px", transition: "width 0.4s" }} />
                       </div>
@@ -267,6 +283,7 @@ const ReportPage = () => {
             </div>
           )}
         </div>
+
       </div>
     </div>
   );

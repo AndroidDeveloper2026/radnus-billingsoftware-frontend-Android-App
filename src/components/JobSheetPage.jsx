@@ -202,6 +202,7 @@ useEffect(() => {
   /* ================= SERVICE ================= */
   const today = new Date().toISOString().split("T")[0];
   const [engineer, setEngineer] = useState("");
+
   const [engineerList, setEngineerList] = useState([]);
 
   useEffect(() => {
@@ -335,7 +336,8 @@ const handleUpdate = async () => {
     formData.append("accessories", JSON.stringify(accessories));
     formData.append("visualIssues", JSON.stringify(visualIssues.filter(Boolean)));
     formData.append("service", JSON.stringify({
-      engineer, dealer, drawer, serviceRep,
+      engineer,
+      dealer, drawer, serviceRep,
       serviceCharge: Number(serviceCharge || 0),
       spareCharge:   Number(spareCharge   || 0),
       estimate, paymentMode, repairDate, deliveryDate,
@@ -406,7 +408,10 @@ const handleSave = async () => {
       formData.append("accessories", JSON.stringify(accessories));
       formData.append("visualIssues", JSON.stringify(visualIssues.filter(Boolean)));
       formData.append("service", JSON.stringify({ 
-        engineer, dealer, drawer, serviceRep,
+        engineer,
+       
+        
+        dealer, drawer, serviceRep,
         instaFollowers,
         googleReview,advanceDate,
         serviceCharge: Number(serviceCharge || 0), 
@@ -467,6 +472,7 @@ setGoogleReview("");
     setCustomFaults({}); 
 setAdvanceDate("");
     setEngineer("");
+    setSoftwareEngineer(""); // ADD THIS
     setDealer("");
     setDrawer("");
     setServiceCharge("");
@@ -497,6 +503,7 @@ setMargin("");
   /* ================= EDIT DATA ================= */
 useEffect(() => {
   if (!isEdit || !editData) return;
+if (!engineerList.length) return;  // ← ADD THIS
 
   setCustomerName(editData.customer?.name || "");
   setContact(editData.customer?.contact || "");
@@ -526,7 +533,8 @@ useEffect(() => {
 
   setPhysicalCondition(editData.physicalCondition || []);
   setAccessories(editData.accessories || []);
-  setEngineer(editData.service?.engineer || "");
+ setEngineer(editData.service?.engineer || "");
+
   setDealer(editData.service?.dealer || "");
   setDrawer(editData.service?.drawer || "");
   setServiceCharge(editData.service?.serviceCharge || "");
@@ -540,7 +548,7 @@ useEffect(() => {
   setAdvanceAmount(editData.service?.advanceAmount || "");
   setMargin(editData.service?.margin || "");
 
-}, [isEdit, editData]);
+}, [isEdit, editData, engineerList]);
 
 
 
@@ -706,6 +714,7 @@ const getWorkloadBadge = (engName) => {
               <option value="Repaired">Repaired</option>
               <option value="Delivered">Delivered</option>
               <option value="Delivered NR/NA">Delivered NR/NA</option>
+                <option value="Cancelled">Cancelled</option> 
             </select>
           </div>
 
@@ -1108,6 +1117,7 @@ onSelect={(customer) => {
                   <option value="Repaired">Repaired</option>
                   <option value="Delivered">Delivered</option>
                   <option value="Delivered NR/NA">Delivered NR/NA</option>
+                  <option value="Cancelled">Cancelled</option>
                 </select>
               </div>
               <div className="col-md-4">
@@ -1158,59 +1168,61 @@ onSelect={(customer) => {
               <div className="row g-2">
                 <div className="row g-2">
 
-                  {/* Engineer – DROPDOWN */}
-                <div className="col-md-4">
-                    <select
-                      className="form-select form-select-sm"
-                      value={engineer}
-                      onChange={e => setEngineer(e.target.value)}
-                      style={{ borderColor: engineer && (workloadMap[engineer] || 0) >= MAX_JOBS ? "#ef4444" : "" }}
-                    >
-                      <option value="">Select Engineer</option>
-                      {engineerList.map((eng, i) => {
-                        const name  = eng.name || eng;
-                        const badge = getWorkloadBadge(name);
-                        return (
-                          <option key={i} value={name} disabled={badge.disabled}>
-                            {badge.label}
-                          </option>
-                        );
-                      })}
-                    </select>
- 
-                    {/* WORKLOAD STATUS UNDER DROPDOWN */}
-                    {engineer && (() => {
-                      const count = workloadMap[engineer] || 0;
-                      const free  = MAX_JOBS - count;
-                      if (count >= MAX_JOBS) return (
-                        <div style={{ marginTop: 5, fontSize: 11, fontWeight: 600, color: "#991b1b", background: "#fee2e2", borderRadius: 6, padding: "3px 8px", display: "flex", alignItems: "center", gap: 4 }}>
-                          🔴 Full capacity — choose another engineer
-                        </div>
-                      );
-                      if (count >= 4) return (
-                        <div style={{ marginTop: 5, fontSize: 11, fontWeight: 600, color: "#92400e", background: "#fef3c7", borderRadius: 6, padding: "3px 8px", display: "flex", alignItems: "center", gap: 4 }}>
-                          ⚠️ {count}/{MAX_JOBS} jobs — {free} slot left
-                        </div>
-                      );
-                      return (
-                        <div style={{ marginTop: 5, fontSize: 11, fontWeight: 500, color: "#166534", background: "#dcfce7", borderRadius: 6, padding: "3px 8px", display: "flex", alignItems: "center", gap: 4 }}>
-                          ✅ {count}/{MAX_JOBS} jobs — {free} slots free
-                        </div>
-                      );
-                    })()}
-                  </div>
+<div className="col-md-4">
+
+  <select
+    className="form-select form-select-sm"
+    value={engineer}
+    onChange={e => setEngineer(e.target.value)}
+    style={{ borderColor: engineer && (workloadMap[engineer] || 0) >= MAX_JOBS ? "#ef4444" : "" }}
+  >
+    <option value="">Select Engineer</option>
+    {engineerList.map((eng, i) => {
+      const name  = eng.name || eng;
+      const badge = getWorkloadBadge(name);
+      return (
+        <option key={i} value={name} disabled={badge.disabled}>
+          🔧 {badge.label}
+        </option>
+      );
+    })}
+  </select>
+  {engineer && (() => {
+    const count = workloadMap[engineer] || 0;
+    const free  = MAX_JOBS - count;
+    if (count >= MAX_JOBS) return (
+      <div style={{ marginTop: 5, fontSize: 11, fontWeight: 600, color: "#991b1b", background: "#fee2e2", borderRadius: 6, padding: "3px 8px" }}>
+        🔴 Full capacity — choose another engineer
+      </div>
+    );
+    if (count >= 4) return (
+      <div style={{ marginTop: 5, fontSize: 11, fontWeight: 600, color: "#92400e", background: "#fef3c7", borderRadius: 6, padding: "3px 8px" }}>
+        ⚠️ {count}/{MAX_JOBS} jobs — {free} slot left
+      </div>
+    );
+    return (
+      <div style={{ marginTop: 5, fontSize: 11, fontWeight: 500, color: "#166534", background: "#dcfce7", borderRadius: 6, padding: "3px 8px" }}>
+        ✅ {count}/{MAX_JOBS} jobs — {free} slots free
+      </div>
+    );
+  })()}
+</div>
+
  
 
                   {/* Dealer – TEXTBOX */}
-                  <div className="col-md-4">
-                    <input
-                      placeholder="Dealer Name"
-                      className="form-control form-control-sm"
-                      value={dealer}
-                      onChange={(e) => setDealer(e.target.value)}
-                    />
-
-                  </div>
+                {/* Dealer – TEXTBOX */}
+<div className="col-md-4">
+  <input
+    placeholder="Dealer Name"
+    className="form-control form-control-sm"
+    value={dealer}
+    onChange={(e) => {
+      const val = e.target.value.replace(/[^a-zA-Z\u0B80-\u0BFF\s.]/g, "");
+      setDealer(val);
+    }}
+  />
+</div>
 
                   {/* Drawer – DROPDOWN */}
                   <div className="col-md-4">

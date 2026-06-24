@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import axios from "axios";
 
-const DeliveryPendingReport = () => {
+const DeliveryReport = () => {
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
   const [data, setData] = useState([]);
@@ -55,10 +55,10 @@ const DeliveryPendingReport = () => {
       {/* 🔥 MAIN HEADER */}
       <div className="mb-6">
         <h1 className="text-3xl font-bold text-gray-800">
-          Delivery Pending Report
+          Delivery  Report
         </h1>
         <p className="text-gray-500 text-sm">
-          Track all repaired devices pending delivery
+          Track all repaired devices  delivery
         </p>
       </div>
 
@@ -205,4 +205,4 @@ const DeliveryPendingReport = () => {
   );
 };
 
-export default DeliveryPendingReport;
+export default DeliveryReport;

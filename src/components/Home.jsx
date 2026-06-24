@@ -86,7 +86,7 @@ const Home = () => {
     if (item === "Engineer Addition") setShowEngineerModal(true);
     if (item === "User List")         setShowUserList(true);
     if (item === "User Addition")     setShowUserModal(true);
-    if (item === "Sales Rep Report")  navigate("/salesrep-report"); // ✅
+
   };
 
   return (
@@ -105,7 +105,7 @@ const Home = () => {
           {role === "admin" && (
             <NavItem
               title="Admin Operation"
-              items={["Engineer Addition", "User List", "User Addition", "Sales Rep Report"]} // ✅ இங்கே மாத்தினோம்
+              items={["Engineer Addition", "User List", "User Addition", ]} // ✅ இங்கே மாத்தினோம்
               onItemClick={handleAdminItem}
             />
           )}
@@ -137,7 +137,7 @@ const Home = () => {
               <div onClick={() => { setShowEngineerModal(true); setMobileMenu(false); }} className="px-6 py-2 text-slate-400">Engineer Addition</div>
               <div onClick={() => { setShowUserList(true); setMobileMenu(false); }} className="px-6 py-2 text-slate-400">User List</div>
               <div onClick={() => { setShowUserModal(true); setMobileMenu(false); }} className="px-6 py-2 text-slate-400">User Addition</div>
-              <div onClick={() => { navigate("/salesrep-report"); setMobileMenu(false); }} className="px-6 py-2 text-slate-400">Sales Rep Report</div> {/* ✅ */}
+          
             </>
           )}
           <div onClick={() => { setShowFaultModal(true);  setMobileMenu(false); }} className="px-6 py-2 text-slate-400">Fault</div>

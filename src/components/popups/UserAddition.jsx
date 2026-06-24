@@ -64,7 +64,7 @@ const UserAddition = ({ onClose }) => {
   };
 
   const handleDeleteRep = async (id) => {
-    if (!window.confirm("Delete this sales rep?")) return;
+    if (!window.confirm("Delete this service rep?")) return;
     await axios.delete(`${API}/api/salesreps/${id}`);
     fetchReps();
   };
@@ -91,7 +91,7 @@ const UserAddition = ({ onClose }) => {
             <div className="flex items-center gap-2">
               <span className="text-xl">{activeTab === "user" ? "👤" : "🧑‍💼"}</span>
               <h2 className="text-xl font-bold text-black">
-                {activeTab === "user" ? "Add New User" : "Sales Rep Management"}
+                {activeTab === "user" ? "Add New User" : "Service Rep Management"}
               </h2>
             </div>
             <button onClick={onClose} className="text-gray-500 hover:text-red-500 text-lg">✖</button>
@@ -101,7 +101,7 @@ const UserAddition = ({ onClose }) => {
           <div className="flex bg-gray-100 rounded-xl p-1 mb-5 gap-1">
             {[
               { key: "user",    label: "👤 Add User"    },
-              { key: "salesrep", label: "🧑‍💼 Sales Reps" },
+              { key: "salesrep", label: "🧑‍💼 Service Reps" },
             ].map(tab => (
               <button
                 key={tab.key}
@@ -204,7 +204,7 @@ const UserAddition = ({ onClose }) => {
               <div className="flex gap-2 mb-4">
                 <input
                   className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none bg-white text-black"
-                  placeholder="Sales Rep Name (e.g. Kalai)"
+                  placeholder="Service Rep Name (e.g. Kalai)"
                   value={newName}
                   onChange={e => setNewName(e.target.value)}
                   onKeyDown={e => e.key === "Enter" && handleAddRep()}
@@ -222,7 +222,7 @@ const UserAddition = ({ onClose }) => {
               <div className="space-y-2 max-h-64 overflow-y-auto">
                 {repList.length === 0 ? (
                   <p className="text-gray-400 text-sm text-center py-6">
-                    No sales reps yet. Add one above ☝️
+                    No service reps yet. Add one above ☝️
                   </p>
                 ) : (
                   repList.map((rep, i) => (
@@ -258,7 +258,7 @@ const UserAddition = ({ onClose }) => {
 
               {repList.length > 0 && (
                 <p className="text-xs text-gray-400 text-center mt-3">
-                  {repList.length} sales rep{repList.length > 1 ? "s" : ""} registered
+                  {repList.length} service rep{repList.length > 1 ? "s" : ""} registered
                 </p>
               )}
 

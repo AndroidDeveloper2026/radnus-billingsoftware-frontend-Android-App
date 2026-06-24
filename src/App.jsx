@@ -7,13 +7,13 @@ import Home from "./components/Home";
 import EstimateBill from "./components/EstimateBill";
 import RepairedReport from "./components/reports/Repairedreport";
 // App.jsx / routes-ல்
-import SalesRepReportPage from "./components/reports/SalesRepReportPage";
+import ServiceRepReportPage from "./components/reports/ServiceRepReportPage";
 
 
 import DailyPendingReport from "./components/reports/DailyPendingReport";
 import ReportPage from "./components/reports/MainReportPage";
 import RepairPendingReport from "./components/reports/RepairPendingReport";
-import DeliveryPendingReport from "./components/reports/DeliveryPendingReport";
+import DeliveryReport from "./components/reports/DeliveryReport";
 import ValueReport from "./components/reports/ValueReport";
 import EngineerValueReport from "./components/reports/EngineerValueReport";
 import DailyReceivedReport from "./components/reports/DailyReceivedReport";
@@ -50,28 +50,31 @@ function App() {
         <Route path="/report" element={<ReportPage />} />
                <Route path="/pending-report"  element={<RepairPendingReport />} />
         <Route path="/repaired-report" element={<RepairedReport />} />
-        <Route path="/delivered-report" element={<DeliveryPendingReport />} />
-
+        <Route path="/delivered-report" element={<DeliveryReport />} />
 
 
 
 
 
         
-      <Route path="/pending-report" element={<DailyPendingReport />} />
-
+      
         <Route path="/value-report" element={<ValueReport />} />
         <Route path="/engineer-report" element={<EngineerValueReport />} />
         <Route path="/received-report" element={<DailyReceivedReport />} />
-        <Route path="/repaired-report" element={<DailyRepairedReport />} />
-        <Route path="/delivered-report" element={<DailyDeliveredOKReport />} />
+     
+      <Route path="/daily-pending-report"   element={<DailyPendingReport />} />
+<Route path="/daily-repaired-report"  element={<DailyRepairedReport />} />
+<Route path="/daily-delivered-report" element={<DailyDeliveredOKReport />} />
         <Route path="/delivered-nrna-report" element={<DailyDeliveredNRNAReport />} />
         <Route path="/all-report" element={<AllReportPage />} />
         <Route path="/engineer-all-report" element={<EngineerReportPage />} />
         <Route path="/dealer-report" element={<DealerReportPage />} />
 
 
-<Route path="/salesrep-report" element={<SalesRepReportPage />} />
+<Route path="/salesrep-report" element={<ServiceRepReportPage />} />
+
+
+<Route path="/my-report" element={<ServiceRepReportPage />} />
      
         <Route path="/rebill-report" element={<RebillReportPage />} />
         <Route path="/user-list" element={<UserListPopup />} />

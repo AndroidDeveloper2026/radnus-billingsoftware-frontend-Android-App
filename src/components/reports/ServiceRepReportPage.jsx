@@ -59,7 +59,7 @@ const SummaryCard = ({ label, value, accent }) => (
 
 // ✅ Updated headers — added Insta + Google
 const JOB_HEADERS = [
-  "#", "Job Sheet", "Sales Rep", "Created By", "Customer",
+  "#", "Job Sheet", "Service Rep", "Created By", "Customer",
   "Contact", "Device", "Status",
   "Service ₹", "Spare ₹", "Margin ₹", "Advance ₹","Adv. Date", "Total ₹",
   "📸 Insta", "⭐ Google", // ✅ NEW
@@ -122,7 +122,10 @@ const JobRow = ({ job, i, rep }) => {
 /* ═══════════════════════════════════════════════════
    MAIN
 ═══════════════════════════════════════════════════ */
-const SalesRepReportPage = () => {
+const ServiceRepReportPage = () => {
+   const currentUser = JSON.parse(sessionStorage.getItem("user"));
+  const currentRole = currentUser?.role;
+  const currentName = currentUser?.name || currentUser?.username || "";
   const [data,       setData]       = useState({});
   const [loading,    setLoading]    = useState(false);
   const [searchText, setSearchText] = useState("");
@@ -131,7 +134,17 @@ const SalesRepReportPage = () => {
   const [repFilter,  setRepFilter]  = useState("");
   const [view,       setView]       = useState("table");
 
-  useEffect(() => { fetchData(); }, []);
+
+
+useEffect(() => {
+  if (currentRole !== "admin") {
+    fetchData(currentName, "", "");
+  } else {
+    fetchData();
+  }
+}, []);
+
+  
 
   const fetchData = async (search = "", from = "", to = "") => {
     try {
@@ -192,7 +205,7 @@ const SalesRepReportPage = () => {
         const sc = Number(job.service?.serviceCharge || 0);
         const sp = Number(job.service?.spareCharge   || 0);
         rows.push({
-          "Sales Rep":      job.service?.serviceRep || rep,
+          "Service Rep":      job.service?.serviceRep || rep,
           "Created By":     job.createdBy?.username || "—",
           "SL No":          i + 1,
           "Job Sheet":      job.jobSheetNo,
@@ -237,7 +250,9 @@ const SalesRepReportPage = () => {
 
       {/* TITLE + VIEW TOGGLE */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12, marginBottom: 20 }}>
-        <h4 style={{ fontWeight: 700, margin: 0, fontSize: 20 }}>🧑‍💼 Sales Rep Report</h4>
+      <h4 style={{ fontWeight: 700, margin: 0, fontSize: 20 }}>
+  🧑‍💼 {currentRole !== "admin" ? `${currentName}'s Report` : "Service Rep Report"}
+</h4>
         <div style={{ display: "flex", background: "#f1f3f5", borderRadius: 8, padding: 3 }}>
           {[["table", "📋 Table"], ["dashboard", "📊 Dashboard"]].map(([val, label]) => (
             <button key={val} onClick={() => setView(val)} style={{
@@ -265,30 +280,45 @@ const SalesRepReportPage = () => {
         <SummaryCard label="⭐ Google Review" value={totalGoogleYes}     accent="#d97706" />
       </div>
 
-      {/* FILTERS */}
-      <div style={{ display: "flex", gap: 8, marginBottom: 20, flexWrap: "wrap", alignItems: "flex-end" }}>
-        <input className="form-control" style={{ maxWidth: 240 }}
-          placeholder="Search sales rep name..."
-          value={searchText}
-          onChange={e => setSearchText(e.target.value)}
-          onKeyDown={e => e.key === "Enter" && handleSearch()} />
-        <div>
-          <div style={{ fontSize: 11, color: "#6c757d", marginBottom: 3 }}>From</div>
-          <input type="date" className="form-control" style={{ maxWidth: 150 }} value={fromDate} onChange={e => setFromDate(e.target.value)} />
-        </div>
-        <div>
-          <div style={{ fontSize: 11, color: "#6c757d", marginBottom: 3 }}>To</div>
-          <input type="date" className="form-control" style={{ maxWidth: 150 }} value={toDate} onChange={e => setToDate(e.target.value)} />
-        </div>
-        <button className="btn btn-primary" onClick={handleSearch}>Search</button>
-        {(searchText || fromDate || toDate) && (
-          <button className="btn btn-outline-secondary" onClick={handleClear}>Clear</button>
-        )}
-        <button className="btn btn-success ms-auto" onClick={handleExcel} disabled={repList.length === 0}>
-          ⬇ Excel
-        </button>
-      </div>
-
+ {currentRole === "admin" ? (
+  <div style={{ display: "flex", gap: 8, marginBottom: 20, flexWrap: "wrap", alignItems: "flex-end" }}>
+    <input className="form-control" style={{ maxWidth: 240 }}
+      placeholder="Search service rep name..."
+      value={searchText}
+      onChange={e => setSearchText(e.target.value)}
+      onKeyDown={e => e.key === "Enter" && handleSearch()} />
+    <div>
+      <div style={{ fontSize: 11, color: "#6c757d", marginBottom: 3 }}>From</div>
+      <input type="date" className="form-control" style={{ maxWidth: 150 }} value={fromDate} onChange={e => setFromDate(e.target.value)} />
+    </div>
+    <div>
+      <div style={{ fontSize: 11, color: "#6c757d", marginBottom: 3 }}>To</div>
+      <input type="date" className="form-control" style={{ maxWidth: 150 }} value={toDate} onChange={e => setToDate(e.target.value)} />
+    </div>
+    <button className="btn btn-primary" onClick={handleSearch}>Search</button>
+    {(searchText || fromDate || toDate) && (
+      <button className="btn btn-outline-secondary" onClick={handleClear}>Clear</button>
+    )}
+    <button className="btn btn-success ms-auto" onClick={handleExcel} disabled={repList.length === 0}>
+      ⬇ Excel
+    </button>
+  </div>
+) : (
+  <div style={{ display: "flex", gap: 8, marginBottom: 20, flexWrap: "wrap", alignItems: "flex-end" }}>
+    <div>
+      <div style={{ fontSize: 11, color: "#6c757d", marginBottom: 3 }}>From</div>
+      <input type="date" className="form-control" style={{ maxWidth: 150 }} value={fromDate} onChange={e => setFromDate(e.target.value)} />
+    </div>
+    <div>
+      <div style={{ fontSize: 11, color: "#6c757d", marginBottom: 3 }}>To</div>
+      <input type="date" className="form-control" style={{ maxWidth: 150 }} value={toDate} onChange={e => setToDate(e.target.value)} />
+    </div>
+    <button className="btn btn-primary" onClick={() => fetchData(currentName, fromDate, toDate)}>Search</button>
+    <button className="btn btn-success ms-auto" onClick={handleExcel} disabled={repList.length === 0}>
+      ⬇ Excel
+    </button>
+  </div>
+)}
       {loading && <div className="text-center py-4 text-muted">Loading...</div>}
       {!loading && repList.length === 0 && <div className="text-center text-muted py-4">No data found</div>}
 
@@ -368,7 +398,7 @@ const SalesRepReportPage = () => {
       {!loading && view === "dashboard" && (
         <div>
           <div style={{ marginBottom: 20 }}>
-            <div style={{ fontSize: 12, color: "#6c757d", marginBottom: 4, fontWeight: 500 }}>Select Sales Rep</div>
+            <div style={{ fontSize: 12, color: "#6c757d", marginBottom: 4, fontWeight: 500 }}>Select Service Rep</div>
             <select className="form-select" style={{ maxWidth: 240 }} value={repFilter} onChange={e => setRepFilter(e.target.value)}>
               <option value="">All Reps</option>
               {repList.map(r => <option key={r} value={r}>{r}</option>)}
@@ -378,12 +408,12 @@ const SalesRepReportPage = () => {
           {/* ALL REPS OVERVIEW — ✅ added Insta + Google columns */}
           {!repFilter && (
             <div style={{ border: "1px solid #e9ecef", borderRadius: 10, overflow: "hidden", marginBottom: 28, boxShadow: "0 1px 4px rgba(0,0,0,0.05)" }}>
-              <div style={{ padding: "10px 16px", background: "#f8f9fa", borderBottom: "1px solid #e9ecef", fontWeight: 600, fontSize: 14 }}>All Sales Reps — Overview</div>
+              <div style={{ padding: "10px 16px", background: "#f8f9fa", borderBottom: "1px solid #e9ecef", fontWeight: 600, fontSize: 14 }}>All Service Reps — Overview</div>
               <div style={{ overflowX: "auto" }}>
                 <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
                   <thead>
                     <tr style={{ background: "#f8f9fa" }}>
-                      {["Sales Rep", "Total Jobs", "Service ₹", "Spare ₹", "Total ₹", "Advance ₹", "Margin ₹", "📸 Insta Yes", "⭐ Google Yes"].map(h => (
+                      {["Service Rep", "Total Jobs", "Service ₹", "Spare ₹", "Total ₹", "Advance ₹", "Margin ₹", "📸 Insta Yes", "⭐ Google Yes"].map(h => (
                         <th key={h} style={{ padding: "9px 12px", borderBottom: "1px solid #e9ecef", color: "#6c757d", fontWeight: 500, fontSize: 12, whiteSpace: "nowrap" }}>{h}</th>
                       ))}
                     </tr>
@@ -488,4 +518,4 @@ const SalesRepReportPage = () => {
   );
 };
 
-export default SalesRepReportPage
+export default ServiceRepReportPage
