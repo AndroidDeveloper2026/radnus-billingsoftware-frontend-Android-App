@@ -1447,38 +1447,34 @@ onSelect={(customer) => {
 
       {visualIssues.map((issue, i) => (
         <div className="mb-2" key={i}>
-
-          {/* DROPDOWN */}
-          <select
-            className="form-select form-select-sm"
-           value={customFaults[i] !== undefined ? "__custom" : (issue || "")}
-            onChange={(e) => {
-              if (e.target.value === "__custom") {
-                // dropdown "__custom" select பண்ணும்போது
-                // customFaults-ல் empty string வை, visualIssues-ல் "" வை
+          <Select
+            options={[
+              ...faultList.map(f => ({ label: f.name, value: f.name })),
+              { label: "Other (Add New)", value: "__custom" }
+            ]}
+            value={
+              customFaults[i] !== undefined
+                ? { label: "Other (Add New)", value: "__custom" }
+                : issue
+                ? { label: issue, value: issue }
+                : null
+            }
+            onChange={(selected) => {
+              if (!selected || selected.value === "__custom") {
                 setCustomFaults(prev => ({ ...prev, [i]: "" }));
                 updateIssue(i, "");
               } else {
-               
                 setCustomFaults(prev => {
                   const copy = { ...prev };
                   delete copy[i];
                   return copy;
                 });
-                updateIssue(i, e.target.value);
+                updateIssue(i, selected.value);
               }
             }}
-          >
-            <option value="">Select Issue</option>
-            {faultList.map(f => (
-              <option key={f._id} value={f.name}>
-                {f.name}
-              </option>
-            ))}
-            <option value="__custom">Other (Add New)</option>
-          </select>
-
-          {/* CUSTOM INPUT — "__custom" select ஆனால் மட்டும் காட்டு */}
+            placeholder="Search Issue..."
+            isClearable
+          />
           {customFaults[i] !== undefined && (
             <input
               className="form-control form-control-sm mt-2"
@@ -1486,15 +1482,11 @@ onSelect={(customer) => {
               value={customFaults[i]}
               onChange={(e) => {
                 const val = e.target.value;
-                // customFaults update பண்ணு (input காட்டுவதற்கு)
                 setCustomFaults(prev => ({ ...prev, [i]: val }));
-                // visualIssues-ல் typed value store பண்ணு (save-க்கு)
                 updateIssue(i, val);
               }}
             />
           )}
-
-          {/* REMOVE BUTTON */}
           {visualIssues.length > 1 && (
             <button
               className="btn btn-outline-danger btn-sm mt-1 w-100"
@@ -1510,7 +1502,6 @@ onSelect={(customer) => {
               ✕ Remove
             </button>
           )}
-
         </div>
       ))}
 
