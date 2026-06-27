@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import axios from "axios";
-
+import * as XLSX from "xlsx";
 const DailyDeliveredOKReport = () => {
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
@@ -62,7 +62,18 @@ const DailyDeliveredOKReport = () => {
   const totalCount = summary.reduce((sum, i) => sum + i.count, 0);
 
   const handlePrint = () => window.print();
+const handleExcelDownload = () => {
+  const excelRows = summary.map((item) => ({
+    "Date": item.date,
+    "Delivered Count": item.count,
+  }));
+  excelRows.push({ "Date": "Total", "Delivered Count": totalCount });
 
+  const ws = XLSX.utils.json_to_sheet(excelRows);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Delivered Report");
+  XLSX.writeFile(wb, `DeliveredReport_${fromDate || "All"}_to_${toDate || "All"}.xlsx`);
+};
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-100 to-gray-200 p-6">
 
@@ -105,8 +116,18 @@ const DailyDeliveredOKReport = () => {
           onClick={handlePrint}
           className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg shadow"
         >
-          Print / Download
+          Print 
         </button>
+        <button
+  onClick={handleExcelDownload}
+  className="bg-emerald-700 hover:bg-emerald-800 text-white px-4 py-2 rounded-lg shadow"
+>
+  📥 Excel Download
+</button>
+
+
+
+
       </div>
 
       {/* 🔥 REPORT CARD */}

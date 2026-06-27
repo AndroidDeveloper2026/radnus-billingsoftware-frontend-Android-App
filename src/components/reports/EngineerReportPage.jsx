@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
-
+import * as XLSX from "xlsx";
 const EngineerReportPage = () => {
   const [data, setData] = useState([]);
   const [groupedData, setGroupedData] = useState({});
@@ -80,7 +80,45 @@ const EngineerReportPage = () => {
     if (status === "Delivered NR/NA") return "bg-red-100 text-red-700";
     return "bg-gray-100 text-gray-600";
   };
+const handleExcelDownload = () => {
+  const excelRows = [];
 
+  Object.entries(groupedData).forEach(([engineer, records]) => {
+    // Engineer header row
+    excelRows.push({
+      "SL No": `👨‍🔧 ${engineer} (${records.length} jobs)`,
+      "Job No": "", "Customer": "", "Contact": "",
+      "Saved Date": "", "Delivered Date": "", "Engineer": "", "Status": "",
+    });
+
+    // Data rows
+    records.forEach((item, i) => {
+      excelRows.push({
+        "SL No": i + 1,
+        "Job No": item.jobSheetNo || "-",
+        "Customer": item.customer?.name || "-",
+        "Contact": item.customer?.contact || "-",
+        "Saved Date": new Date(item.createdAt).toISOString().slice(0, 10),
+        "Delivered Date": item.service?.deliveryDate
+          ? new Date(item.service.deliveryDate).toISOString().slice(0, 10)
+          : "-",
+        "Engineer": item.service?.engineer || "No Engineer",
+        "Status": item.device?.mobileStatus || "-",
+      });
+    });
+
+    // Blank separator
+    excelRows.push({
+      "SL No": "", "Job No": "", "Customer": "", "Contact": "",
+      "Saved Date": "", "Delivered Date": "", "Engineer": "", "Status": "",
+    });
+  });
+
+  const ws = XLSX.utils.json_to_sheet(excelRows);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Engineer Report");
+  XLSX.writeFile(wb, `EngineerReport_${fromDate || "All"}_to_${toDate || "All"}.xlsx`);
+};
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-100 to-gray-200 p-6">
 
@@ -136,8 +174,14 @@ const EngineerReportPage = () => {
           onClick={handlePrint}
           className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg shadow"
         >
-          Print / Download
+          Print 
         </button>
+        <button
+  onClick={handleExcelDownload}
+  className="bg-emerald-700 hover:bg-emerald-800 text-white px-4 py-2 rounded-lg shadow"
+>
+  📥 Excel Download
+</button>
       </div>
 
       {/* GROUPED SECTIONS */}

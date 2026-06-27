@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
-
+import * as XLSX from "xlsx";
 const RebillReportPage = () => {
   const [data,         setData]         = useState([]);
   const [filtered,     setFiltered]     = useState([]);
@@ -82,7 +82,51 @@ const RebillReportPage = () => {
     const curr = (j.service?.serviceCharge || 0) + (j.service?.spareCharge || 0);
     return sum + hist + curr;
   }, 0);
+const handleExcel = () => {
+  const rows = [];
 
+  filtered.forEach((job) => {
+    // each past rebill instance as a row
+    (job.rebillHistory || []).forEach((rb, ri) => {
+      rows.push({
+        "Job No":        job.jobSheetNo,
+        "Customer":      job.customer?.name    || "-",
+        "Contact":       job.customer?.contact || "-",
+        "Device":        [job.device?.make, job.device?.model].filter(Boolean).join(" ") || "-",
+        "Engineer":      job.service?.engineer || "-",
+        "Repair No":     `Repair #${ri + 1}`,
+        "Service Charge": rb.serviceCharge || 0,
+        "Spare Charge":  rb.spareCharge   || 0,
+        "Total":         (rb.serviceCharge || 0) + (rb.spareCharge || 0),
+        "Remarks":       rb.remarks    || "-",
+        "Rebilled By":   rb.rebilledBy || "-",
+        "Rebilled At":   fmtDate(rb.rebilledAt),
+      });
+    });
+
+    // current active repair as the last row
+    rows.push({
+      "Job No":        job.jobSheetNo,
+      "Customer":      job.customer?.name    || "-",
+      "Contact":       job.customer?.contact || "-",
+      "Device":        [job.device?.make, job.device?.model].filter(Boolean).join(" ") || "-",
+      "Engineer":      job.service?.engineer || "-",
+      "Repair No":     `Current Repair #${(job.rebillHistory?.length || 0) + 1}`,
+      "Service Charge": job.service?.serviceCharge || 0,
+      "Spare Charge":  job.service?.spareCharge   || 0,
+      "Total":         (job.service?.serviceCharge || 0) + (job.service?.spareCharge || 0),
+      "Remarks":       "-",
+      "Rebilled By":   "-",
+      "Rebilled At":   "-",
+      "Status":        job.device?.mobileStatus || "-",
+    });
+  });
+
+  const ws = XLSX.utils.json_to_sheet(rows);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Rebill Report");
+  XLSX.writeFile(wb, `Rebill_Report_${new Date().toLocaleDateString("en-GB").replace(/\//g, "-")}.xlsx`);
+};
   return (
     <div style={{ minHeight: "100vh", background: "#f1f5f9", fontFamily: "'Segoe UI', sans-serif" }}>
       <style>{`
@@ -104,16 +148,20 @@ const RebillReportPage = () => {
             <h1 style={{ margin: 0, fontSize: 22, fontWeight: 800, color: "#0f172a" }}>🔄 Rebill Report</h1>
             <p style={{ margin: "4px 0 0", fontSize: 13, color: "#64748b" }}>Jobs that were reopened and rebilled after invoice</p>
           </div>
-          <div className="no-print" style={{ display: "flex", gap: 8 }}>
-            <button onClick={() => navigate(-1)}
-              style={{ background: "#f1f5f9", color: "#475569", border: "1.5px solid #e2e8f0", borderRadius: 8, padding: "7px 16px", fontWeight: 600, fontSize: 13, cursor: "pointer" }}>
-              ← Back
-            </button>
-            <button onClick={() => window.print()}
-              style={{ background: "#10b981", color: "#fff", border: "none", borderRadius: 8, padding: "7px 16px", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>
-              🖨️ Print
-            </button>
-          </div>
+  <div className="no-print" style={{ display: "flex", gap: 8 }}>
+  <button onClick={() => navigate(-1)}
+    style={{ background: "#f1f5f9", color: "#475569", border: "1.5px solid #e2e8f0", borderRadius: 8, padding: "7px 16px", fontWeight: 600, fontSize: 13, cursor: "pointer" }}>
+    ← Back
+  </button>
+  <button onClick={() => window.print()}
+    style={{ background: "#10b981", color: "#fff", border: "none", borderRadius: 8, padding: "7px 16px", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>
+    🖨️ Print
+  </button>
+  <button onClick={handleExcel}
+    style={{ background: "#6366f1", color: "#fff", border: "none", borderRadius: 8, padding: "7px 16px", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>
+    ⬇ Excel
+  </button>
+</div>
         </div>
 
         {/* SUMMARY CARDS */}

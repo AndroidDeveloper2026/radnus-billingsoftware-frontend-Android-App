@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import axios from "axios";
-
+import * as XLSX from "xlsx";
 const DailyPendingReport = () => {
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
@@ -36,7 +36,19 @@ const DailyPendingReport = () => {
   };
 
   const totalCount = summary.reduce((sum, i) => sum + i.count, 0);
+const handleExcelDownload = () => {
+  const excelRows = summary.map((item) => ({
+    "Date": item.date,
+    "Pending Count": item.count,
+  }));
 
+  excelRows.push({ "Date": "Total", "Pending Count": totalCount });
+
+  const ws = XLSX.utils.json_to_sheet(excelRows);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Pending Report");
+  XLSX.writeFile(wb, `PendingReport_${fromDate || "All"}_to_${toDate || "All"}.xlsx`);
+};
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-100 to-gray-200 p-6">
 
@@ -56,8 +68,12 @@ const DailyPendingReport = () => {
         </button>
         <button onClick={() => window.print()}
           className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg shadow">
-          Print / Download
+          Print 
         </button>
+        <button onClick={handleExcelDownload}
+  className="bg-emerald-700 hover:bg-emerald-800 text-white px-4 py-2 rounded-lg shadow">
+  📥 Excel Download
+</button>
       </div>
 
       <div className="bg-white rounded-xl shadow-lg border max-w-xl mx-auto">

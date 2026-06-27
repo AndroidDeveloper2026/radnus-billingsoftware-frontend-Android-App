@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
-
+import * as XLSX from "xlsx";
 const SpareReportPage = () => {
 
   const [engineers, setEngineers] = useState([]);
@@ -104,7 +104,28 @@ const SpareReportPage = () => {
   };
 
   const handlePrint = () => window.print();
+const handleExcel = () => {
+  const rows = [];
 
+  Object.entries(groupedData).forEach(([eng, records]) => {
+    records.forEach((item, i) => {
+      rows.push({
+        "Engineer":  eng,
+        "SL No":     i + 1,
+        "Job Sheet": item.jobSheet,
+        "Spare":     item.spare,
+        "Qty":       item.qty,
+        "Rate":      item.rate,
+        "Amount":    item.amount,
+      });
+    });
+  });
+
+  const ws = XLSX.utils.json_to_sheet(rows);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Spare Report");
+  XLSX.writeFile(wb, `Spare_Report_${new Date().toLocaleDateString("en-GB").replace(/\//g, "-")}.xlsx`);
+};
   return (
 
     <div className="min-h-screen bg-gray-100 p-6">
@@ -204,9 +225,15 @@ const SpareReportPage = () => {
           onClick={handlePrint}
           className="bg-green-600 text-white px-6 py-2 rounded-lg"
         >
-          Print / Download
+          Print 
         </button>
-
+<button
+  onClick={handleExcel}
+  className="bg-blue-600 text-white px-6 py-2 rounded-lg"
+  disabled={Object.keys(groupedData).length === 0}
+>
+  ⬇ Excel
+</button>
       </div>
 
       {/* TABLE */}

@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import axios from "axios";
-
+import * as XLSX from "xlsx";
 const Repairedreport = () => {
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
@@ -45,7 +45,30 @@ const Repairedreport = () => {
     if (status === "Repaired") return "bg-blue-100 text-blue-700";
     return "bg-gray-100 text-gray-600";
   };
+const handleExcelDownload = () => {
+  if (data.length === 0) {
+    alert("No data to export ❌");
+    return;
+  }
 
+  const exportData = data.map((item) => ({
+    "Job No": item.jobSheetNo || "-",
+    "Customer": item.customer?.name || "-",
+    "Make": item.device?.make || "-",
+    "Model": item.device?.model || "-",
+    "Phone": item.customer?.contact || "-",
+    "Date": item.createdAt
+      ? new Date(item.createdAt).toISOString().slice(0, 10)
+      : "-",
+    "Fault": item.visualIssues?.length ? item.visualIssues.join(", ") : "-",
+    "Status": item.device?.mobileStatus || "-",
+  }));
+
+  const worksheet = XLSX.utils.json_to_sheet(exportData);
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, worksheet, "Repaired Report");
+  XLSX.writeFile(workbook, `Repaired_Report_${fromDate || "all"}_to_${toDate || "all"}.xlsx`);
+};
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-100 to-gray-200 p-6">
 
@@ -79,8 +102,14 @@ const Repairedreport = () => {
           onClick={handlePrint}
           className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg shadow"
         >
-          Print / Download
+          Print
         </button>
+        <button
+  onClick={handleExcelDownload}
+  className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg shadow"
+>
+  Excel Download
+</button>
       </div>
 
       {/* REPORT CARD */}

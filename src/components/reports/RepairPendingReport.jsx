@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import axios from "axios";
-
+import * as XLSX from "xlsx";
 const RepairPendingReport = () => {
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
@@ -57,7 +57,29 @@ const RepairPendingReport = () => {
     if (status === "Received") return "bg-blue-100 text-blue-700";
     return "bg-gray-100 text-gray-600";
   };
+const handleExcelDownload = () => {
+  const excelRows = data.map((item, i) => ({
+    "SL No": i + 1,
+    "Job No": item.jobSheetNo || "-",
+    "Customer": item.customer?.name || "-",
+    "Make": item.device?.make || "-",
+    "Model": item.device?.model || "-",
+    "Phone": item.customer?.contact || "-",
+    "Date": item.createdAt ? new Date(item.createdAt).toISOString().slice(0, 10) : "-",
+    "Fault": item.visualIssues?.length ? item.visualIssues.join(", ") : "-",
+    "Status": item.device?.mobileStatus || "-",
+  }));
 
+  excelRows.push({
+    "SL No": "Total", "Job No": data.length, "Customer": "", "Make": "",
+    "Model": "", "Phone": "", "Date": "", "Fault": "", "Status": "",
+  });
+
+  const ws = XLSX.utils.json_to_sheet(excelRows);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Repair Pending");
+  XLSX.writeFile(wb, `RepairPendingReport_${fromDate || "All"}_to_${toDate || "All"}.xlsx`);
+};
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-100 to-gray-200 p-6">
 
@@ -99,8 +121,14 @@ const RepairPendingReport = () => {
           onClick={handlePrint}
           className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg shadow"
         >
-          Print / Download
+          Print 
         </button>
+        <button
+  onClick={handleExcelDownload}
+  className="bg-emerald-700 hover:bg-emerald-800 text-white px-4 py-2 rounded-lg shadow"
+>
+  📥 Excel Download
+</button>
       </div>
 
       {/* 🔥 REPORT CARD */}

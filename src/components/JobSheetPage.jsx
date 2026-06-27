@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from "react";
+
+import AdvancePopup from "./AdvancePopup";
 import axios from "axios";
 import makeModelData from "../data/makeModelData";
 import JobSheetSearchModal from "./JobSheetSearchModal";
@@ -231,6 +233,8 @@ useEffect(() => {
   const [deliveryDate, setDeliveryDate] = useState("");
   const [remarks, setRemarks] = useState("");
 const [advanceAmount, setAdvanceAmount] = useState("");
+const [advanceItems, setAdvanceItems] = useState([]);
+const [showAdvancePopup, setShowAdvancePopup] = useState(false);
 const [margin, setMargin] = useState("");
 
 
@@ -334,6 +338,7 @@ const handleUpdate = async () => {
     formData.append("device", JSON.stringify({ make: make === "__custom" ? customMake : make, model: model === "__custom" ? customModel : model, imei, warranty, pattern, mobileStatus }));
     formData.append("physicalCondition", JSON.stringify(physicalCondition));
     formData.append("accessories", JSON.stringify(accessories));
+    formData.append("advanceItems", JSON.stringify(advanceItems));
     formData.append("visualIssues", JSON.stringify(visualIssues.filter(Boolean)));
     formData.append("service", JSON.stringify({
       engineer,
@@ -406,6 +411,7 @@ const handleSave = async () => {
       formData.append("device", JSON.stringify({ make: make === "__custom" ? customMake : make, model: model === "__custom" ? customModel : model, imei, warranty, pattern, mobileStatus }));
       formData.append("physicalCondition", JSON.stringify(physicalCondition));
       formData.append("accessories", JSON.stringify(accessories));
+      formData.append("advanceItems", JSON.stringify(advanceItems));
       formData.append("visualIssues", JSON.stringify(visualIssues.filter(Boolean)));
       formData.append("service", JSON.stringify({ 
         engineer,
@@ -443,7 +449,9 @@ const handleSave = async () => {
   }; // ← handleSave ends here
 
   /* ================= NEW ================= */
-
+// handleUpdate-ல் top-ல்:
+console.log("advanceItems being saved:", advanceItems);
+console.log("advanceAmount:", advanceAmount);
   const handleNew = (nextNo = null) => {
     // ✅ clear all fields
     setCustomerName("");
@@ -471,8 +479,9 @@ setGoogleReview("");
     setVisualIssues([""]);
     setCustomFaults({}); 
 setAdvanceDate("");
+setAdvanceItems([]); 
     setEngineer("");
-    setSoftwareEngineer(""); // ADD THIS
+   
     setDealer("");
     setDrawer("");
     setServiceCharge("");
@@ -546,6 +555,7 @@ if (!engineerList.length) return;  // ← ADD THIS
   setDeliveryDate(editData.service?.deliveryDate?.slice(0, 10) || "");
   setRemarks(editData.service?.remarks || "");
   setAdvanceAmount(editData.service?.advanceAmount || "");
+  setAdvanceItems(editData.service?.advanceItems || []);  
   setMargin(editData.service?.margin || "");
 
 }, [isEdit, editData, engineerList]);
@@ -1294,32 +1304,29 @@ onSelect={(customer) => {
                   </select>
                 </div>
               </div>
+{/* ROW 3 – Adv.Amount (popup) | Margin | S.Rep */}
+<div className="row g-2 mt-2 align-items-start">
 
-{/* ROW 3 – Advance, Advance Date, Margin, Service Rep */}
-{/* ROW 3 – Adv.Amount | Adv.Date | Margin | S.Rep */}
-<div className="row g-2 mt-2 flex-nowrap align-items-end">
-
-  <div className="col">
+  {/* Adv Amount — click → popup */}
+  <div className="col-md-4">
     <input
       type="text"
       className="form-control form-control-sm"
       placeholder="Adv. Amount ₹"
       value={advanceAmount}
-      onChange={(e) => setAdvanceAmount(onlyNumbers(e.target.value))}
+      readOnly
+      onClick={() => setShowAdvancePopup(true)}
+      style={{ cursor: "pointer", background: "#f8f9fa" }}
     />
+    {advanceItems.length > 0 && (
+      <div style={{ fontSize: 10, color: "#0d6efd", marginTop: 2, fontWeight: 500 }}>
+        💰 {advanceItems.length} payment{advanceItems.length > 1 ? "s" : ""}
+      </div>
+    )}
   </div>
 
-  <div className="col">
-    <input
-      type="date"
-      className="form-control form-control-sm"
-      placeholder="Adv. Date"
-      value={advanceDate}
-      onChange={(e) => setAdvanceDate(e.target.value)}
-    />
-  </div>
-
-  <div className="col">
+  {/* Margin */}
+  <div className="col-md-4">
     <input
       type="text"
       className="form-control form-control-sm"
@@ -1330,7 +1337,8 @@ onSelect={(customer) => {
     />
   </div>
 
-  <div className="col-3" style={{ marginLeft: "auto" }}>
+  {/* Service Rep */}
+  <div className="col-md-4">
     <select
       className="form-select form-select-sm"
       value={serviceRep}
@@ -1346,7 +1354,6 @@ onSelect={(customer) => {
   </div>
 
 </div>
-
 {/* ROW 4 – Repair Date, Delivery Date, Insta, Google */}
 <div className="row g-2 mt-2">
   <div className="col-md-3">
@@ -1755,6 +1762,18 @@ onSelect={(customer) => {
              existingItems={spareItems} 
         />
       )}
+{/* ✅ இதை add பண்ணு */}
+{showAdvancePopup && (
+  <AdvancePopup
+    onClose={() => setShowAdvancePopup(false)}
+    setAdvanceAmount={setAdvanceAmount}
+    setAdvanceItems={setAdvanceItems}
+    existingItems={advanceItems}
+  />
+)}
+
+
+
 
       {/* ✅ REPAIR STEPS TIMELINE */}
       {isEdit && editData?._id && (

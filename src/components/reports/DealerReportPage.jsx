@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
-
+import * as XLSX from "xlsx";
 const DealerReportPage = () => {
   const [data, setData] = useState([]);
   const [filteredData, setFilteredData] = useState([]);
@@ -78,6 +78,31 @@ const DealerReportPage = () => {
     if (status === "Repaired") return "bg-green-100 text-green-700";
     return "bg-gray-100 text-gray-600";
   };
+  const handleExcelDownload = () => {
+  const excelRows = filteredData.map((item, i) => ({
+    "SL No": i + 1,
+    "Dealer": item.service?.dealer || "-",
+    "Customer": item.customer?.name || "-",
+    "Contact": item.customer?.contact || "-",
+    "Saved Date": new Date(item.createdAt).toISOString().slice(0, 10),
+    "Delivered Date": item.service?.deliveryDate
+      ? new Date(item.service.deliveryDate).toISOString().slice(0, 10)
+      : "-",
+    "Engineer": item.service?.engineer || "-",
+    "Status": item.device?.mobileStatus || "-",
+  }));
+
+  excelRows.push({
+    "SL No": "Total", "Dealer": filteredData.length, "Customer": "",
+    "Contact": "", "Saved Date": "", "Delivered Date": "",
+    "Engineer": "", "Status": "",
+  });
+
+  const ws = XLSX.utils.json_to_sheet(excelRows);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Dealer Report");
+  XLSX.writeFile(wb, `DealerReport_${fromDate || "All"}_to_${toDate || "All"}.xlsx`);
+};
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-100 to-gray-200 p-6">
@@ -128,8 +153,14 @@ const DealerReportPage = () => {
           onClick={handlePrint}
           className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg shadow"
         >
-          Print / Download
+          Print 
         </button>
+        <button
+  onClick={handleExcelDownload}
+  className="bg-emerald-700 hover:bg-emerald-800 text-white px-4 py-2 rounded-lg shadow"
+>
+  📥 Excel Download
+</button>
       </div>
 
       {/* 🔥 REPORT CARD */}

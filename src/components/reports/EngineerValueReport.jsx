@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
-
+import * as XLSX from "xlsx";
 const EngineerValueReport = () => {
   const [engineer, setEngineer] = useState("");
   const [engineerList, setEngineerList] = useState([]);
@@ -89,7 +89,68 @@ const EngineerValueReport = () => {
   const grandTotal = totalService + totalSpare;
 
   const handlePrint = () => window.print();
+const handleExcelDownload = () => {
+  const excelRows = [];
 
+  Object.keys(groupedData).sort().forEach((date) => {
+    const items = groupedData[date];
+
+    // Date header
+    excelRows.push({
+      "Job No": `📅 ${date}`, "Name": "", "Engineer": "",
+      "Received": "", "Repaired": "", "Delivered": "",
+      "Service ₹": "", "Spare ₹": "", "Total ₹": "",
+    });
+
+    // Data rows
+    items.forEach((item) => {
+      const s  = item.service?.serviceCharge || 0;
+      const sp = item.service?.spareCharge   || 0;
+      excelRows.push({
+        "Job No": item.jobSheetNo || "-",
+        "Name": item.customer?.name || "-",
+        "Engineer": item.service?.engineer || "-",
+        "Received": item.createdAt ? new Date(item.createdAt).toISOString().slice(0, 10) : "-",
+        "Repaired": item.service?.repairDate ? new Date(item.service.repairDate).toISOString().slice(0, 10) : "-",
+        "Delivered": item.service?.deliveryDate ? new Date(item.service.deliveryDate).toISOString().slice(0, 10) : "-",
+        "Service ₹": s.toFixed(2),
+        "Spare ₹": sp.toFixed(2),
+        "Total ₹": (s + sp).toFixed(2),
+      });
+    });
+
+    // Sub total
+    const sTotal  = items.reduce((sum, i) => sum + (i.service?.serviceCharge || 0), 0);
+    const spTotal = items.reduce((sum, i) => sum + (i.service?.spareCharge   || 0), 0);
+    excelRows.push({
+      "Job No": "", "Name": "", "Engineer": "", "Received": "",
+      "Repaired": "", "Delivered": "Sub Total",
+      "Service ₹": sTotal.toFixed(2),
+      "Spare ₹": spTotal.toFixed(2),
+      "Total ₹": (sTotal + spTotal).toFixed(2),
+    });
+
+    // Blank row
+    excelRows.push({
+      "Job No": "", "Name": "", "Engineer": "", "Received": "",
+      "Repaired": "", "Delivered": "", "Service ₹": "", "Spare ₹": "", "Total ₹": "",
+    });
+  });
+
+  // Grand total
+  excelRows.push({
+    "Job No": "", "Name": "", "Engineer": "", "Received": "",
+    "Repaired": "", "Delivered": "GRAND TOTAL",
+    "Service ₹": totalService.toFixed(2),
+    "Spare ₹": totalSpare.toFixed(2),
+    "Total ₹": grandTotal.toFixed(2),
+  });
+
+  const ws = XLSX.utils.json_to_sheet(excelRows);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Engineer Value Report");
+  XLSX.writeFile(wb, `EngineerValueReport_${fromDate || "All"}_to_${toDate || "All"}.xlsx`);
+};
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-100 to-gray-200 p-6">
 
@@ -144,8 +205,15 @@ const EngineerValueReport = () => {
           onClick={handlePrint}
           className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg shadow"
         >
-          Print / Download
+          Print 
         </button>
+
+        <button
+  onClick={handleExcelDownload}
+  className="bg-emerald-700 hover:bg-emerald-800 text-white px-4 py-2 rounded-lg shadow"
+>
+  📥 Excel Download
+</button>
       </div>
 
       {/* 🔥 REPORT CARD */}
