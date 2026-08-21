@@ -18,6 +18,7 @@ const InvoiceBill = () => {
 
   if (!job) return <p>Loading...</p>;
 
+  // ── ONLY Income field is used for invoice totals (spare charge excluded) ──
   const items =
     job.items?.length > 0
       ? job.items
@@ -27,13 +28,12 @@ const InvoiceBill = () => {
             model: job.device?.model,
             imei: job.device?.imei,
             fault: job.visualIssues?.join(", "),
-            service: job.service?.serviceCharge,
-            spare: job.service?.spareCharge,
+            service: job.service?.income,
           },
         ];
 
   const subTotal = items.reduce(
-    (sum, i) => sum + Number(i.service || 0) + Number(i.spare || 0),
+    (sum, i) => sum + Number(i.service || 0),
     0
   );
 
@@ -245,7 +245,7 @@ lineHeight: "1.6"
     <td style={td}>{item.imei || "-"}</td>
     <td style={td}>{item.fault || "-"}</td>
     <td style={td}>
-      ₹ {(Number(item.service || 0) + Number(item.spare || 0)).toFixed(2)}
+      ₹ {Number(item.service || 0).toFixed(2)}
     </td>
   </tr>
 ))}
