@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from "react";
 import AdvancePopup from "./AdvancePopup";
 import axios from "axios";
-import makeModelData from "../data/makeModelData";
 import JobSheetSearchModal from "./JobSheetSearchModal";
 import SparePopup from "./SparePopup";
 import OthersPopup from "./OthersPopup";
@@ -13,7 +12,8 @@ import { useNavigate } from "react-router-dom";
 import {
   FileText, Save, RefreshCw, Calculator, Receipt, Home, Plus, Ban,
   Menu, Bell, Bandage, Gift, User, Smartphone, Wrench, Eye,
-  Instagram, Star, Package, Wallet, ThumbsUp, X
+  Instagram, Star, Package, Wallet, ThumbsUp, X, Calendar, MessageCircle,
+  Clock, Cog, CheckCircle2, IndianRupee, AlertCircle, AlertTriangle, Info
 } from "lucide-react";
 
 const isValidEmail = (email) =>
@@ -24,6 +24,36 @@ const isValidIMEI = (imei) => /^\d{15}$/.test(imei);
 const isRequired = (value) => value && value.toString().trim().length > 0;
 
 const onlyNumbers = (value) => value.replace(/\D/g, "");
+
+/* ================= FREE TYPO-TOLERANT FUZZY SEARCH =================
+   No API/cost — plain Levenshtein edit-distance. Used as a custom filterOption for the
+   Make / Model / Fault / Physical Condition / Accessories react-select dropdowns so a typo
+   like "Semsung" still finds "Samsung" in the master list. Since the user still has to PICK
+   an option from the list, the saved value is always the correctly-spelled master entry. */
+const levenshtein = (a, b) => {
+  const m = a.length, n = b.length;
+  if (m === 0) return n;
+  if (n === 0) return m;
+  const dp = Array.from({ length: m + 1 }, () => new Array(n + 1).fill(0));
+  for (let i = 0; i <= m; i++) dp[i][0] = i;
+  for (let j = 0; j <= n; j++) dp[0][j] = j;
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      if (a[i - 1] === b[j - 1]) dp[i][j] = dp[i - 1][j - 1];
+      else dp[i][j] = 1 + Math.min(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1]);
+    }
+  }
+  return dp[m][n];
+};
+
+const fuzzyFilterOption = (option, inputValue) => {
+  if (!inputValue) return true;
+  const label = (option.label || "").toLowerCase();
+  const input = inputValue.toLowerCase();
+  if (label.includes(input)) return true; // normal substring match still works first
+  const maxDist = Math.max(1, Math.ceil(input.length * 0.3)); // ~30% typo tolerance
+  return label.split(/\s+/).some(word => levenshtein(word, input) <= maxDist);
+};
 
 /* ================= RADNUS THEME (SOFTENED) ================= */
 const RED = "#DC2626";
@@ -48,7 +78,7 @@ const sideBtnBase = {
   color: "#fff",
 };
 
-/* ================= FIELD LABEL — persistent label above every input (NEW) =================
+/* ================= FIELD LABEL — persistent label above every input =================
    Fixes: once a value is typed, the placeholder disappears and the user can no longer tell
    which field they're looking at (e.g. Income vs Service Charges). A small permanent label
    above the field solves this for new/first-time users at a new store. */
@@ -75,7 +105,121 @@ const Field = ({ label, required, children }) => (
   </div>
 );
 
-/* ================= BOTTOM ACTION BAR — SOLID COLORFUL BUTTONS (NEW) ================= */
+/* ================= MODERN FIELD VALIDATION MESSAGES =================
+   Replaces the old plain "⚠️ Customer Name is required" text with a small pill-style
+   message that has an icon, a soft background, and a gentle slide/fade-in animation so
+   it doesn't just "pop" into existence. Used everywhere formErrors used to be rendered
+   directly. FieldSuccess is the green equivalent for "✅ looks good" states. */
+const FieldError = ({ children }) => (
+  <div
+    style={{
+      display: "flex",
+      alignItems: "flex-start",
+      gap: 6,
+      marginTop: 5,
+      padding: "4px 8px",
+      borderRadius: 6,
+      background: "#FEF2F2",
+      border: "1px solid #FECACA",
+      animation: "fieldMsgIn 0.18s ease",
+    }}
+  >
+    <AlertCircle size={13} color={RED_TEXT} style={{ flexShrink: 0, marginTop: 1 }} />
+    <span style={{ fontSize: 11.5, color: RED_TEXT, fontWeight: 600, lineHeight: 1.3 }}>
+      {children}
+    </span>
+  </div>
+);
+
+const FieldSuccess = ({ children }) => (
+  <div
+    style={{
+      display: "flex",
+      alignItems: "center",
+      gap: 6,
+      marginTop: 5,
+      animation: "fieldMsgIn 0.18s ease",
+    }}
+  >
+    <CheckCircle2 size={13} color="#16A34A" style={{ flexShrink: 0 }} />
+    <span style={{ fontSize: 11.5, color: "#16A34A", fontWeight: 600 }}>{children}</span>
+  </div>
+);
+
+/* ================= MODERN TOAST NOTIFICATIONS =================
+   Drop-in replacement for every window.alert(...) call in this page. Toasts stack in the
+   top-right corner, auto-dismiss after ~4s, can be clicked away early, and are styled per
+   type (success / error / warning / info) instead of the browser's plain alert box.
+   Usage: showToast("Job Sheet Saved", "success") */
+const TOAST_STYLES = {
+  success: { accent: "#16A34A", bg: "#F0FDF4", icon: CheckCircle2 },
+  error: { accent: "#DC2626", bg: "#FEF2F2", icon: AlertCircle },
+  warning: { accent: "#D97706", bg: "#FFFBEB", icon: AlertTriangle },
+  info: { accent: "#2563EB", bg: "#EFF6FF", icon: Info },
+};
+
+const Toast = ({ toast, onDismiss }) => {
+  const cfg = TOAST_STYLES[toast.type] || TOAST_STYLES.info;
+  const Icon = cfg.icon;
+  return (
+    <div
+      onClick={() => onDismiss(toast.id)}
+      role="alert"
+      style={{
+        display: "flex",
+        alignItems: "flex-start",
+        gap: 10,
+        minWidth: 280,
+        maxWidth: 380,
+        background: "#fff",
+        borderLeft: `4px solid ${cfg.accent}`,
+        borderRadius: 10,
+        padding: "12px 14px",
+        boxShadow: "0 10px 30px rgba(0,0,0,0.14), 0 2px 6px rgba(0,0,0,0.08)",
+        cursor: "pointer",
+        animation: "toastIn 0.28s cubic-bezier(0.22, 1, 0.36, 1)",
+      }}
+    >
+      <div
+        style={{
+          width: 26, height: 26, borderRadius: "50%", background: cfg.bg,
+          display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+        }}
+      >
+        <Icon size={15} color={cfg.accent} />
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div
+          style={{
+            fontSize: 13, fontWeight: 600, color: "#111827",
+            lineHeight: 1.45, whiteSpace: "pre-line", wordBreak: "break-word",
+          }}
+        >
+          {toast.message}
+        </div>
+      </div>
+      <X size={14} color="#9CA3AF" style={{ flexShrink: 0, marginTop: 2 }} />
+    </div>
+  );
+};
+
+const ToastContainer = ({ toasts, onDismiss }) => (
+  <div
+    style={{
+      position: "fixed", top: 16, right: 16, zIndex: 999999,
+      display: "flex", flexDirection: "column", gap: 10,
+      pointerEvents: "none",
+    }}
+  >
+    {toasts.map((t) => (
+      <div key={t.id} style={{ pointerEvents: "auto" }}>
+        <Toast toast={t} onDismiss={onDismiss} />
+      </div>
+    ))}
+  </div>
+);
+
+/* ================= BOTTOM ACTION BAR — SOLID COLORFUL BUTTONS ================= */
 const sideBtnSave = { ...sideBtnBase, background: "#DC2626" };       // Save / Update — red
 const sideBtnRefresh = { ...sideBtnBase, background: "#475569" };    // Refresh — slate
 const sideBtnEstimate = { ...sideBtnBase, background: "#2563EB" };   // Estimate — blue
@@ -84,6 +228,7 @@ const sideBtnHome = { ...sideBtnBase, background: "#0D9488" };       // Home —
 const sideBtnNew = { ...sideBtnBase, background: "#16A34A" };        // New — green
 const sideBtnCancel = { ...sideBtnBase, background: "#991B1B" };     // Cancel — dark red
 const sideBtnRebill = { ...sideBtnBase, background: "#D97706" };     // Rebill — amber
+const sideBtnWhatsApp = { ...sideBtnBase, background: "#25D366" };   // Send WhatsApp — WhatsApp green (NEW)
 
 const redHeader = {
   background: RED_SOFT_BG, color: RED_TEXT, fontWeight: 700,
@@ -91,14 +236,14 @@ const redHeader = {
   padding: "6px 12px", fontSize: 13
 };
 
-/* ================= YELLOW HEADER — DARKENED (UPDATED) ================= */
+/* ================= YELLOW HEADER — DARKENED ================= */
 const yellowHeader = {
   background: "#FDE68A", color: "#7C2D12", fontWeight: 700,
   borderBottom: "1px solid #F59E0B", letterSpacing: 0.2,
   padding: "6px 12px", fontSize: 13
 };
 
-/* ================= REACT-SELECT DARK TEXT STYLES (NEW) ================= */
+/* ================= REACT-SELECT DARK TEXT STYLES ================= */
 const selectDarkText = {
   control: (base) => ({ ...base, minHeight: 31, borderColor: "#CBD5E1" }),
   placeholder: (base) => ({ ...base, color: "#6B7280", fontWeight: 400 }),
@@ -113,7 +258,7 @@ const selectDarkText = {
   multiValueLabel: (base) => ({ ...base, color: "#111827", fontWeight: 500 }),
 };
 
-/* ================= COMPACT SELECT — fixed short height, single-line text (NEW) =================
+/* ================= COMPACT SELECT — fixed short height, single-line text =================
    Used for single-value dropdowns (Make, Model) where the placeholder/value should stay on
    one line instead of wrapping and stretching the field taller than the inputs beside it. */
 const selectCompactText = {
@@ -132,13 +277,53 @@ const selectCompactText = {
   }),
 };
 
+/* ================= TOP STATS CARD — Pending / In Process / Delivered / Revenue =================
+   Small dashboard-style cards shown above the Job Sheet Info Bar (same idea as an admin
+   summary strip). Counts come from ALL job sheets (via /api/jobsheets/filter), not just the
+   one currently open on this page — so opening/editing a single Job Sheet still shows the
+   shop-wide totals. Cancelled job sheets are excluded from every count. */
+const statCardWrap = {
+  borderRadius: 10, padding: "8px 10px", display: "flex",
+  flexDirection: "row", alignItems: "center", gap: 8, height: "100%",
+};
+
+const StatCard = ({ label, value, icon, bg }) => (
+  <div className="col-6 col-md">
+    <div className="card shadow-sm" style={statCardWrap}>
+      <div style={{
+        width: 30, height: 30, borderRadius: "50%", background: bg,
+        display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0
+      }}>
+        {icon}
+      </div>
+      <div style={{ minWidth: 0 }}>
+        <div style={{ fontSize: 10.5, color: "#6B7280", fontWeight: 600, whiteSpace: "nowrap" }}>{label}</div>
+        <div style={{ fontSize: 15, fontWeight: 700, color: "#111827", whiteSpace: "nowrap" }}>{value}</div>
+      </div>
+    </div>
+  </div>
+);
+
 const JobSheetPage = ({ editData = null, isEdit = false }) => {
   const [makeList, setMakeList] = useState([]);
   const [modelList, setModelList] = useState([]);
   const navigate = useNavigate();
   const [jobSheetNo, setJobSheetNo] = useState("");
   const [saving, setSaving] = useState(false);
+  const [updating, setUpdating] = useState(false);
   const [rebilling, setRebilling] = useState(false);
+  // ================= DUPLICATE-SUBMIT GUARD REFS (NEW) =================
+  // 🔴 WHY REFS AND NOT JUST STATE: setSaving/setUpdating are async — React doesn't
+  // repaint "disabled" onto the button instantly. If the user (or a slow network /
+  // accidental second tap) fires the click handler twice within that same tick, BOTH
+  // calls still read the OLD state ("not saving/updating yet") and both go through —
+  // two parallel PUT/POST requests hit the backend at the same time. This is exactly
+  // what caused JS-598's revenueEntries to end up with duplicate rows for the same
+  // day: two Update calls racing each other. A ref updates synchronously the instant
+  // we set it, so the very next line of code (even before React re-renders) already
+  // sees the new value — the second click is blocked for real.
+  const savingRef = React.useRef(false);
+  const updatingRef = React.useRef(false);
   const pendingNextNo = React.useRef(null);
   const API = import.meta.env.VITE_API_URL;
   const loggedInUser = JSON.parse(sessionStorage.getItem("user") || "{}");
@@ -146,9 +331,63 @@ const JobSheetPage = ({ editData = null, isEdit = false }) => {
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [cancelRemarksInput, setCancelRemarksInput] = useState("");
   const [cancelling, setCancelling] = useState(false);
-  /* ================= VALIDATION (NEW) ================= */
+
+  /* ================= TOAST NOTIFICATIONS =================
+     Replaces every window.alert(...) in this file. Call showToast("message", "success" |
+     "error" | "warning" | "info"). Auto-dismisses after 4s; click a toast to dismiss early. */
+  const [toasts, setToasts] = useState([]);
+  const showToast = (message, type = "info") => {
+    const id = Date.now() + Math.random();
+    setToasts((prev) => [...prev, { id, message, type }]);
+    setTimeout(() => {
+      setToasts((prev) => prev.filter((t) => t.id !== id));
+    }, 4000);
+  };
+  const dismissToast = (id) => setToasts((prev) => prev.filter((t) => t.id !== id));
+
+  /* ================= TOP STATS (Pending / In Process / Delivered / Revenue) =================
+     "In Process" = Device Status "Repaired" (mudinjuchu, innum deliver pannala).
+     Total Revenue = sum of service.income across all non-cancelled job sheets.
+     Change this mapping below if unga "In Process" vera status-ah irundha (e.g. Received). */
+  const [jobStats, setJobStats] = useState({ total: 0, pending: 0, inProcess: 0, delivered: 0, totalRevenue: 0 });
+  const [statsLoading, setStatsLoading] = useState(false);
+
+  const fetchJobStats = () => {
+    setStatsLoading(true);
+    axios.get(`${API}/api/jobsheets/filter`)
+      .then((res) => {
+        const all = res.data || [];
+        // Total = ella job sheets-um (cancelled-um serthu), AllReportPage-oda "Total Records" madhiri
+        const total = all.length;
+        let pending = 0, inProcess = 0, delivered = 0, totalRevenue = 0;
+        all.forEach((js) => {
+          if (js.isCancelled) return; // cancelled jobs status-counts + revenue-la skip
+          const status = js.device?.mobileStatus;
+          if (status === "Pending") pending++;
+          else if (status === "Repaired") inProcess++;
+          else if (status === "Delivered" || status === "Delivered NR/NA") delivered++;
+          totalRevenue += Number(js.service?.income || 0);
+        });
+        setJobStats({ total, pending, inProcess, delivered, totalRevenue });
+      })
+      .catch((err) => console.error("Job stats fetch error:", err))
+      .finally(() => setStatsLoading(false));
+  };
+
+  useEffect(() => {
+    fetchJobStats();
+  }, []);
+
+  /* ================= VALIDATION ================= */
   const [touched, setTouched] = useState({});
   const [formErrors, setFormErrors] = useState({});
+
+  /* ================= DEAD PHONE FLAG (NEW) =================
+     IMEI is now mandatory — but a dead phone has no readable IMEI. Checking this box
+     disables the IMEI input, skips its "required" validation, and saves the device's
+     imei value as "DEAD" instead. Loading an existing job sheet re-derives this flag
+     from a saved imei of "DEAD". */
+  const [isDeadPhone, setIsDeadPhone] = useState(false);
 
   const validateField = (name, value) => {
     switch (name) {
@@ -165,6 +404,21 @@ const JobSheetPage = ({ editData = null, isEdit = false }) => {
         if (!value || value.toString().trim() === "") return "";
         return !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value) ? "Invalid email format" : "";
 
+      case "district":
+        return !value || !value.toString().trim() ? "District is required" : "";
+
+      case "taluk":
+        return !value || !value.toString().trim() ? "Taluk is required" : "";
+
+      case "serviceRep":
+        return !value || !value.toString().trim() ? "Service Rep is required" : "";
+      // ================= IMEI — mandatory unless Dead Phone is checked =================
+      case "imei":
+        if (isDeadPhone) return "";
+        if (!value || !value.toString().trim()) return "IMEI Number is required";
+        if (!/^\d{15}$/.test(value)) return "Must be exactly 15 digits";
+        return "";
+
       default:
         return "";
     }
@@ -175,18 +429,36 @@ const JobSheetPage = ({ editData = null, isEdit = false }) => {
     setFormErrors(prev => ({ ...prev, [name]: validateField(name, value) }));
   };
 
+  /* ================= LIVE CHANGE HANDLER (FIX) =================
+     🔴 BUG FIX: Customer Name & Contact No fields were calling handleLiveChange(...) in
+     their onChange, but that function was never defined anywhere in the file — so every
+     keystroke threw "handleLiveChange is not defined" and React never updated the state,
+     which is why typing looked completely dead in those two fields. This defines it:
+     it updates the field via the given setter AND — only if the field has already been
+     "touched" (blurred once) — re-runs validation live as you type, so an error message
+     can clear itself the moment the value becomes valid instead of waiting for blur again. */
+  const handleLiveChange = (name, value, setter) => {
+    setter(value);
+    if (touched[name]) {
+      setFormErrors(prev => ({ ...prev, [name]: validateField(name, value) }));
+    }
+  };
   const validateAll = () => {
     const errors = {
       customerName: validateField("customerName", customerName),
       contact: validateField("contact", contact),
       email: validateField("email", email),
+      district: validateField("district", district),
+      taluk: validateField("taluk", taluk),
+      imei: validateField("imei", imei),
+      serviceRep: validateField("serviceRep", serviceRep),
     };
     setFormErrors(errors);
-    setTouched({ customerName: true, contact: true, email: true });
-
+    setTouched({ customerName: true, contact: true, email: true, district: true, taluk: true, imei: true, serviceRep: true });
     const errorMessages = Object.values(errors).filter(Boolean);
     if (errorMessages.length > 0) {
-      alert("⚠️ Please fix before Update/Save:\n\n" + errorMessages.join("\n"));
+      // Modern toast instead of window.alert — shows every field that needs fixing in one card.
+      showToast("Please fix before Update/Save:\n" + errorMessages.map(m => `• ${m}`).join("\n"), "error");
       return false;
     }
     return true;
@@ -233,12 +505,36 @@ const JobSheetPage = ({ editData = null, isEdit = false }) => {
   const [othersItems, setOthersItems] = useState([]);
   const [showOthersPopup, setShowOthersPopup] = useState(false);
 
-  /* ================= CUSTOMER ================= */
+  /* ================= CUSTOMER =================
+     🔴 REMOVED: "address" field (state + UI + payload) removed entirely per request —
+     Customer Address is no longer captured anywhere on the Job Sheet. */
   const [customerName, setCustomerName] = useState("");
   const [contact, setContact] = useState("");
   const [altContact, setAltContact] = useState("");
-  const [address, setAddress] = useState("");
   const [email, setEmail] = useState("");
+  // District / Taluk — mandatory, MD sir Excel download-la district & taluk wise filter pananum-nu kekkittaru
+  const [district, setDistrict] = useState("");
+  const [taluk, setTaluk] = useState("");
+
+  /* ================= DISTRICT / TALUK — backend-driven =================
+     Master lists live in Mongo (District / Taluk collections), managed from the sidebar's
+     "Data Operation" → District/Taluk popup (add/edit/delete) — NOT inline here. Job Sheet
+     just fetches and shows whatever's in the DB, exactly like Engineer/Drawer/Sales Rep. */
+  const [districtList, setDistrictList] = useState([]);
+  const [talukList, setTalukList] = useState([]);
+
+  useEffect(() => {
+    axios.get(`${API}/api/districts`)
+      .then(res => setDistrictList(res.data))
+      .catch(err => console.error("District fetch error:", err));
+  }, []);
+
+  useEffect(() => {
+    if (!district) { setTalukList([]); return; }
+    axios.get(`${API}/api/taluks/${district}`)
+      .then(res => setTalukList(res.data))
+      .catch(err => { console.error("Taluk fetch error:", err); setTalukList([]); });
+  }, [district]);
 
 
   /* ================= DEVICE ================= */
@@ -283,7 +579,7 @@ const JobSheetPage = ({ editData = null, isEdit = false }) => {
   const [visualIssues, setVisualIssues] = useState([""]);
   const [faultList, setFaultList] = useState([]);
 
-  /* ================= PHYSICAL CONDITION / ACCESSORIES — now backend-driven (NEW) =================
+  /* ================= PHYSICAL CONDITION / ACCESSORIES — backend-driven =================
      Master lists live in Mongo (PhysicalCondition / Accessory collections) instead of being
      hardcoded here. Picking "Others (Add New)" and typing a name POSTs it to the backend so
      it appears in the dropdown for every future job sheet, not just this one. */
@@ -294,7 +590,7 @@ const JobSheetPage = ({ editData = null, isEdit = false }) => {
   const [addingPhysicalCondition, setAddingPhysicalCondition] = useState(false);
   const [addingAccessory, setAddingAccessory] = useState(false);
 
-  /* ================= MAKE / MODEL / FAULT — Add-New now backend-driven too (NEW) =================
+  /* ================= MAKE / MODEL / FAULT — Add-New backend-driven too =================
      Same problem as Physical Condition/Accessories used to have: typing a new Make, Model, or
      Visual Issue (Fault) only saved it on THIS job sheet's own fields — nothing was POSTed to
      /api/makes, /api/models, or /api/faults, so the master dropdown list never grew and the
@@ -328,139 +624,244 @@ const JobSheetPage = ({ editData = null, isEdit = false }) => {
     ...accessoryList.map(x => ({ label: x.name, value: x.name })),
     { label: "Others (Add New)", value: "__custom" },
   ];
+const handleAddCustomPhysicalCondition = async () => {
+  const val = customPhysicalConditionText.trim();
+  if (!val) return;
 
-  const handleAddCustomPhysicalCondition = async () => {
-    const val = customPhysicalConditionText.trim();
-    if (!val) return;
-    setAddingPhysicalCondition(true);
-    try {
-      const res = await axios.post(`${API}/api/physical-conditions`, { name: val });
-      setPhysicalConditionList(prev => {
-        const exists = prev.some(p => p.name.toLowerCase() === res.data.name.toLowerCase());
-        return exists ? prev : [res.data, ...prev];
-      });
-      // Swap the placeholder "__custom" marker out for the real saved name
-      setPhysicalCondition(prev => {
-        const withoutMarker = prev.filter(v => v !== "__custom");
-        return withoutMarker.includes(res.data.name) ? withoutMarker : [...withoutMarker, res.data.name];
-      });
-      setCustomPhysicalConditionText("");
-    } catch (err) {
-      console.error(err);
-      alert("Failed to add physical condition ❌");
-    } finally {
-      setAddingPhysicalCondition(false);
+  // ✅ CASE-INSENSITIVE LOCAL CHECK FIRST — same idea as handleAddCustomMake.
+  const existingLocal = physicalConditionList.find(
+    (p) => p.name.toString().trim().toLowerCase() === val.toLowerCase()
+  );
+
+  if (existingLocal) {
+    setPhysicalCondition(prev => {
+      const withoutMarker = prev.filter(v => v !== "__custom");
+      return withoutMarker.includes(existingLocal.name) ? withoutMarker : [...withoutMarker, existingLocal.name];
+    });
+    setCustomPhysicalConditionText("");
+    showToast(`"${existingLocal.name}" already exists — selected it`, "warning");
+    return; // 🔴 stop here — do NOT call the add API
+  }
+
+  setAddingPhysicalCondition(true);
+  try {
+    const res = await axios.post(`${API}/api/physical-conditions`, { name: val });
+    setPhysicalConditionList(prev => {
+      const exists = prev.some(p => p.name.toLowerCase() === res.data.name.toLowerCase());
+      return exists ? prev : [res.data, ...prev];
+    });
+    setPhysicalCondition(prev => {
+      const withoutMarker = prev.filter(v => v !== "__custom");
+      return withoutMarker.includes(res.data.name) ? withoutMarker : [...withoutMarker, res.data.name];
+    });
+    setCustomPhysicalConditionText("");
+    if (res.data.alreadyExists) {
+      showToast(res.data.message || `"${res.data.name}" already exists — selected it`, "warning");
+    } else {
+      showToast(`"${res.data.name}" added`, "success");
     }
-  };
+  } catch (err) {
+    console.error(err);
+    showToast("Failed to add physical condition", "error");
+  } finally {
+    setAddingPhysicalCondition(false);
+  }
+};
+ const handleAddCustomAccessory = async () => {
+  const val = customAccessoryText.trim();
+  if (!val) return;
 
-  const handleAddCustomAccessory = async () => {
-    const val = customAccessoryText.trim();
-    if (!val) return;
-    setAddingAccessory(true);
-    try {
-      const res = await axios.post(`${API}/api/accessories`, { name: val });
-      setAccessoryList(prev => {
-        const exists = prev.some(a => a.name.toLowerCase() === res.data.name.toLowerCase());
-        return exists ? prev : [res.data, ...prev];
-      });
-      setAccessories(prev => {
-        const withoutMarker = prev.filter(v => v !== "__custom");
-        return withoutMarker.includes(res.data.name) ? withoutMarker : [...withoutMarker, res.data.name];
-      });
-      setCustomAccessoryText("");
-    } catch (err) {
-      console.error(err);
-      alert("Failed to add accessory ❌");
-    } finally {
-      setAddingAccessory(false);
+  // ✅ CASE-INSENSITIVE LOCAL CHECK FIRST — same idea as handleAddCustomMake.
+  const existingLocal = accessoryList.find(
+    (a) => a.name.toString().trim().toLowerCase() === val.toLowerCase()
+  );
+
+  if (existingLocal) {
+    setAccessories(prev => {
+      const withoutMarker = prev.filter(v => v !== "__custom");
+      return withoutMarker.includes(existingLocal.name) ? withoutMarker : [...withoutMarker, existingLocal.name];
+    });
+    setCustomAccessoryText("");
+    showToast(`"${existingLocal.name}" already exists — selected it`, "warning");
+    return; // 🔴 stop here — do NOT call the add API
+  }
+
+  setAddingAccessory(true);
+  try {
+    const res = await axios.post(`${API}/api/accessories`, { name: val });
+    setAccessoryList(prev => {
+      const exists = prev.some(a => a.name.toLowerCase() === res.data.name.toLowerCase());
+      return exists ? prev : [res.data, ...prev];
+    });
+    setAccessories(prev => {
+      const withoutMarker = prev.filter(v => v !== "__custom");
+      return withoutMarker.includes(res.data.name) ? withoutMarker : [...withoutMarker, res.data.name];
+    });
+    setCustomAccessoryText("");
+    if (res.data.alreadyExists) {
+      showToast(res.data.message || `"${res.data.name}" already exists — selected it`, "warning");
+    } else {
+      showToast(`"${res.data.name}" added`, "success");
     }
-  };
+  } catch (err) {
+    console.error(err);
+    showToast("Failed to add accessory", "error");
+  } finally {
+    setAddingAccessory(false);
+  }
+};
 
-  /* ================= ADD NEW MAKE (NEW) =================
+  /* ================= ADD NEW MAKE =================
      Mirrors handleAddCustomPhysicalCondition — POSTs to /api/makes (makeRoutes.js already
      supports this), pushes the new Make into makeList so the Select dropdown has it right
      away, and switches `make` from "__custom" to the real saved name. */
-  const handleAddCustomMake = async () => {
-    const val = customMake.trim();
-    if (!val) return;
-    setAddingMake(true);
-    try {
-      const res = await axios.post(`${API}/api/makes`, { name: val });
-      const newMakeObj = res.data.data || res.data;
-      setMakeList(prev => {
-        const exists = prev.some(m => (m.name || m).toLowerCase() === newMakeObj.name.toLowerCase());
-        return exists ? prev : [newMakeObj, ...prev];
-      });
-      setMake(newMakeObj.name);
-      setCustomMake("");
-    } catch (err) {
-      console.error(err);
-      alert(err.response?.data?.message || "Failed to add make ❌");
-    } finally {
-      setAddingMake(false);
-    }
-  };
+ const handleAddCustomMake = async () => {
+  const val = customMake.trim();
+  if (!val) return;
 
-  /* ================= ADD NEW MODEL (NEW) =================
+  // ✅ CASE-INSENSITIVE LOCAL CHECK FIRST — no need to hit the API if it's already
+  // in the list we already fetched. "GOOGLE" and "google" are treated as the same.
+  const existingLocal = makeList.find(
+    (m) => (m.name || m).toLowerCase() === val.toLowerCase()
+  );
+
+  if (existingLocal) {
+    const existingName = existingLocal.name || existingLocal;
+    setMake(existingName);
+    setCustomMake("");
+    showToast(`"${existingName}" already exists — selected it`, "warning");
+    return; // 🔴 stop here — do NOT call the add API
+  }
+
+  // Not found locally → genuinely new, so add it
+  setAddingMake(true);
+  try {
+    const res = await axios.post(`${API}/api/makes`, { name: val });
+    const newMakeObj = res.data.data || res.data;
+    setMakeList(prev => {
+      const exists = prev.some(m => (m.name || m).toLowerCase() === newMakeObj.name.toLowerCase());
+      return exists ? prev : [newMakeObj, ...prev];
+    });
+    setMake(newMakeObj.name);
+    setCustomMake("");
+
+    if (res.data.alreadyExists) {
+      showToast(res.data.message || `"${newMakeObj.name}" already exists — selected it`, "warning");
+    } else {
+      showToast(`"${newMakeObj.name}" added`, "success");
+    }
+  } catch (err) {
+    console.error(err);
+    showToast(err.response?.data?.message || "Failed to add make", "error");
+  } finally {
+    setAddingMake(false);
+  }
+};
+
+  /* ================= ADD NEW MODEL =================
      Mirrors handleAddCustomMake — POSTs to /api/models with { name, make }, since modelRoutes.js
      requires both fields. Uses whichever Make is currently selected (or the just-typed custom
      Make) so the new Model is correctly linked. */
-  const handleAddCustomModel = async () => {
-    const val = customModel.trim();
-    if (!val) return;
-    const selectedMake = make === "__custom" ? customMake : make;
-    if (!selectedMake) {
-      alert("⚠️ Select or Add a Make first");
-      return;
-    }
-    setAddingModel(true);
-    try {
-      const res = await axios.post(`${API}/api/models`, { name: val, make: selectedMake });
-      const newModelObj = res.data.data || res.data;
-      setModelList(prev => {
-        const exists = prev.some(m => (m.name || m).toLowerCase() === newModelObj.name.toLowerCase());
-        return exists ? prev : [newModelObj, ...prev];
-      });
-      setModel(newModelObj.name);
-      setCustomModel("");
-    } catch (err) {
-      console.error(err);
-      alert(err.response?.data?.message || "Failed to add model ❌");
-    } finally {
-      setAddingModel(false);
-    }
-  };
+const handleAddCustomModel = async () => {
+  const val = customModel.trim();
+  if (!val) return;
+  const selectedMake = make === "__custom" ? customMake : make;
+  if (!selectedMake) {
+    showToast("Select or Add a Make first", "warning");
+    return;
+  }
 
-  /* ================= ADD NEW FAULT / VISUAL ISSUE (NEW) =================
+  // ✅ CASE-INSENSITIVE LOCAL CHECK FIRST — same idea as handleAddCustomMake.
+  // Models are unique per (name + make) pair, so BOTH must match (trimmed, case-insensitive).
+  const existingLocal = modelList.find((m) => {
+    const mName = (m.name || m).toString().trim().toLowerCase();
+    const mMake = (m.make || selectedMake).toString().trim().toLowerCase();
+    return mName === val.toLowerCase() && mMake === selectedMake.trim().toLowerCase();
+  });
+
+  if (existingLocal) {
+    const existingName = existingLocal.name || existingLocal;
+    setModel(existingName);
+    setCustomModel("");
+    showToast(`"${existingName}" already exists under "${selectedMake}" — selected it`, "warning");
+    return; // 🔴 stop here — do NOT call the add API
+  }
+
+  setAddingModel(true);
+  try {
+    const res = await axios.post(`${API}/api/models`, { name: val, make: selectedMake });
+    const newModelObj = res.data.data || res.data;
+    setModelList(prev => {
+      const exists = prev.some(m => (m.name || m).toLowerCase() === newModelObj.name.toLowerCase());
+      return exists ? prev : [newModelObj, ...prev];
+    });
+    setModel(newModelObj.name);
+    setCustomModel("");
+    if (res.data.alreadyExists) {
+      showToast(res.data.message || `"${newModelObj.name}" already exists — selected it`, "warning");
+    } else {
+      showToast(`"${newModelObj.name}" added`, "success");
+    }
+  } catch (err) {
+    console.error(err);
+    showToast(err.response?.data?.message || "Failed to add model", "error");
+  } finally {
+    setAddingModel(false);
+  }
+};
+
+  /* ================= ADD NEW FAULT / VISUAL ISSUE =================
      Mirrors handleAddCustomAccessory — POSTs to /api/faults so the fault master list
      (faultList) grows, then swaps this row's custom text input back to a normal selected
-     value. NOTE: assumes /api/faults POST accepts { name } and returns the saved fault the
-     same way physical-conditions/accessories do — confirm faultRoutes.js matches if this 404s. */
-  const handleAddCustomFault = async (i) => {
-    const val = (customFaults[i] || "").trim();
-    if (!val) return;
-    setAddingFault(prev => ({ ...prev, [i]: true }));
-    try {
-      const res = await axios.post(`${API}/api/faults`, { name: val });
-      const newFault = res.data.data || res.data;
-      setFaultList(prev => {
-        const exists = prev.some(f => f.name.toLowerCase() === newFault.name.toLowerCase());
-        return exists ? prev : [newFault, ...prev];
-      });
-      setCustomFaults(prev => {
-        const copy = { ...prev };
-        delete copy[i];
-        return copy;
-      });
-      updateIssue(i, newFault.name);
-    } catch (err) {
-      console.error(err);
-      alert(err.response?.data?.message || "Failed to add fault ❌");
-    } finally {
-      setAddingFault(prev => ({ ...prev, [i]: false }));
-    }
-  };
+     value. */
+const handleAddCustomFault = async (i) => {
+  const val = (customFaults[i] || "").trim();
+  if (!val) return;
 
+  // ✅ CASE-INSENSITIVE LOCAL CHECK FIRST — same idea as handleAddCustomMake.
+  const existingLocal = faultList.find(
+    (f) => f.name.toString().trim().toLowerCase() === val.toLowerCase()
+  );
+
+  if (existingLocal) {
+    setCustomFaults(prev => {
+      const copy = { ...prev };
+      delete copy[i];
+      return copy;
+    });
+    updateIssue(i, existingLocal.name);
+    showToast(`"${existingLocal.name}" already exists — selected it`, "warning");
+    return; // 🔴 stop here — do NOT call the add API
+  }
+
+  setAddingFault(prev => ({ ...prev, [i]: true }));
+  try {
+    const res = await axios.post(`${API}/api/faults`, { name: val });
+    // NOTE: faultRoutes.js spreads the fault fields directly (no `.data` wrapper),
+    // so the new fault object IS res.data itself.
+    const newFault = res.data;
+    setFaultList(prev => {
+      const exists = prev.some(f => f.name.toLowerCase() === newFault.name.toLowerCase());
+      return exists ? prev : [newFault, ...prev];
+    });
+    setCustomFaults(prev => {
+      const copy = { ...prev };
+      delete copy[i];
+      return copy;
+    });
+    updateIssue(i, newFault.name);
+    if (res.data.alreadyExists) {
+      showToast(res.data.message || `"${newFault.name}" already exists — selected it`, "warning");
+    } else {
+      showToast(`"${newFault.name}" added`, "success");
+    }
+  } catch (err) {
+    console.error(err);
+    showToast(err.response?.data?.message || "Failed to add fault", "error");
+  } finally {
+    setAddingFault(prev => ({ ...prev, [i]: false }));
+  }
+};
   useEffect(() => {
     axios.get(`${API}/api/faults`)
       .then(res => setFaultList(res.data))
@@ -478,31 +879,16 @@ const JobSheetPage = ({ editData = null, isEdit = false }) => {
         : [...state, value]
     );
   };
-
-
-  useEffect(() => {
-    axios.get(`${API}/api/engineers`)
-      .then(res => setEngineerList(res.data));
-  }, []);
-
-  useEffect(() => {
-    axios.get(`${API}/api/jobsheets/workload`)
-      .then(res => {
-        const map = {};
-        res.data.forEach(e => { map[e.name] = e.activeJobs; });
-        setWorkloadMap(map);
-      })
-      .catch(err => console.error("Workload fetch error:", err));
-  }, []);
-  /* ================= SERVICE ================= */
-  const today = new Date().toISOString().split("T")[0];
+/* ================= SERVICE ================= */
+const today = new Date().toLocaleDateString("en-CA");
   const [engineer, setEngineer] = useState("");
-
   const [engineerList, setEngineerList] = useState([]);
 
+  // NOTE: this was previously fetched twice (duplicate useEffect) — merged into one.
   useEffect(() => {
     axios.get(`${API}/api/engineers`)
-      .then(res => setEngineerList(res.data));
+      .then(res => setEngineerList(res.data))
+      .catch(err => console.error("Engineer fetch error:", err));
   }, []);
 
   const [dealer, setDealer] = useState("");
@@ -514,6 +900,66 @@ const JobSheetPage = ({ editData = null, isEdit = false }) => {
       .then(res => setDrawerList(res.data));
   }, []);
 
+  /* ================= LIVE MASTER-LIST REFRESH =================
+     Fault/Make/Model/Drawer master lists can also be edited from the sidebar's "Data
+     Operation" popups (FaultPopup, AdminMakeModal, AdminModelModal, DrawerPopup). Those popups
+     are just an overlay on top of THIS page — no navigation/remount happens — so JobSheetPage's
+     own faultList/makeList/modelList/drawerList state never knew to refresh after a popup save.
+     Each popup now dispatches a matching custom window event on save/delete; these listeners
+     catch that event and refetch, so the Job Sheet dropdowns update live without needing a
+     page reload. */
+  useEffect(() => {
+    const refetchFaults = () => {
+      axios.get(`${API}/api/faults`)
+        .then(res => setFaultList(res.data))
+        .catch(err => console.error("Fault refetch error:", err));
+    };
+    const refetchMakes = () => {
+      axios.get(`${API}/api/makes`)
+        .then(res => setMakeList(res.data))
+        .catch(err => console.error("Make refetch error:", err));
+    };
+    const refetchModels = () => {
+      const selectedMake = make === "__custom" ? customMake : make;
+      if (!selectedMake) return;
+      axios.get(`${API}/api/models/${selectedMake}`)
+        .then(res => setModelList(res.data))
+        .catch(err => console.error("Model refetch error:", err));
+    };
+    const refetchDrawers = () => {
+      axios.get(`${API}/api/drawers`)
+        .then(res => setDrawerList(res.data))
+        .catch(err => console.error("Drawer refetch error:", err));
+    };
+    const refetchDistricts = () => {
+      axios.get(`${API}/api/districts`)
+        .then(res => setDistrictList(res.data))
+        .catch(err => console.error("District refetch error:", err));
+    };
+    const refetchTaluks = () => {
+      if (!district) return;
+      axios.get(`${API}/api/taluks/${district}`)
+        .then(res => setTalukList(res.data))
+        .catch(err => console.error("Taluk refetch error:", err));
+    };
+
+    window.addEventListener("faultListUpdated", refetchFaults);
+    window.addEventListener("makeListUpdated", refetchMakes);
+    window.addEventListener("modelListUpdated", refetchModels);
+    window.addEventListener("drawerListUpdated", refetchDrawers);
+    window.addEventListener("districtListUpdated", refetchDistricts);
+    window.addEventListener("talukListUpdated", refetchTaluks);
+
+    return () => {
+      window.removeEventListener("faultListUpdated", refetchFaults);
+      window.removeEventListener("makeListUpdated", refetchMakes);
+      window.removeEventListener("modelListUpdated", refetchModels);
+      window.removeEventListener("drawerListUpdated", refetchDrawers);
+      window.removeEventListener("districtListUpdated", refetchDistricts);
+      window.removeEventListener("talukListUpdated", refetchTaluks);
+    };
+  }, [make, customMake, district]);
+
   const [serviceCharge, setServiceCharge] = useState("");
   const [spareCharge, setSpareCharge] = useState("");
   const [spareItems, setSpareItems] = useState([]);
@@ -522,13 +968,27 @@ const JobSheetPage = ({ editData = null, isEdit = false }) => {
 
   const [paymentMode, setPaymentMode] = useState("");
   const [income, setIncome] = useState("");
-  // ✅ NEW — tracks the date Income was last actually changed & saved.
+  // tracks the date Income was last actually changed & saved.
   // Income Report groups by this date, NOT repairDate, so income shows up
   // in the month it was actually entered (e.g. delivered/collected month).
   const [incomeDate, setIncomeDate] = useState("");
+
+  // true only when the USER manually picked a date in the Income Date field.
+  // If false, the date is auto-managed (today's date when Income changes).
+  const [incomeDateTouched, setIncomeDateTouched] = useState(false);
+
+  // ================= INCOME + INCOME DATE MERGED FIELD =================
+  // Ref to the (visually hidden) native date input that lives inside the Income ₹ box.
+  // Clicking the calendar icon opens it via showPicker() so Income amount and Income
+  // Date share a single box instead of two separate fields.
+  const incomeDateRef = React.useRef(null);
+
   // Holds the income value as it was when the job sheet was loaded/last saved,
   // used to detect whether the user genuinely changed Income this session.
   const initialIncomeRef = React.useRef(0);
+   const spareBaselineRef = React.useRef(0);
+   const advanceBaselineRef = React.useRef(0);   // ✅ NEW
+     const othersBaselineRef = React.useRef(0);    // ✅ NEW
   const [repairDate, setRepairDate] = useState(today);
   const [deliveryDate, setDeliveryDate] = useState("");
   const [remarks, setRemarks] = useState("");
@@ -537,19 +997,23 @@ const JobSheetPage = ({ editData = null, isEdit = false }) => {
   const [showAdvancePopup, setShowAdvancePopup] = useState(false);
   const [margin, setMargin] = useState("");
 
-  /* ================= AUTO-CALCULATE SERVICE CHARGE (NEW) =================
+  /* ================= AUTO-CALCULATE SERVICE CHARGE =================
      Service Charge (labour) = Income - Spare Charges - Other Expenses.
      This field is now READ-ONLY and always reflects the remaining amount
      after spare parts & other expenses are deducted from the total income. */
   useEffect(() => {
     const inc = Number(income || 0);
-    const sp = Number(spareCharge || 0);
+    const totalSpare = Number(spareCharge || 0);
+    const currentCycleSpare = Math.max(0, totalSpare - spareBaselineRef.current);
     const oth = Number(othersAmount || 0);
-    const remaining = inc - sp - oth;
+    const remaining = inc - currentCycleSpare - oth;
     setServiceCharge(remaining > 0 ? String(remaining) : "0");
   }, [income, spareCharge, othersAmount]);
 
-
+  useEffect(() => {
+    const total = (spareItems || []).reduce((s, it) => s + Number(it.amount || 0), 0);
+    setSpareCharge(String(total));
+  }, [spareItems]);
   /* ================= VISUAL ISSUES ================= */
   const addIssue = () => setVisualIssues([...visualIssues, ""]);
   const updateIssue = (i, val) => {
@@ -578,7 +1042,7 @@ const JobSheetPage = ({ editData = null, isEdit = false }) => {
   /* ================= CANCEL ================= */
   const handleCancel = async () => {
     if (!cancelRemarksInput.trim()) {
-      alert("Please enter cancel reason");
+      showToast("Please enter cancel reason", "warning");
       return;
     }
     setCancelling(true);
@@ -595,60 +1059,102 @@ const JobSheetPage = ({ editData = null, isEdit = false }) => {
       setLocalEditData(res.data);
       setShowCancelModal(false);
       setCancelRemarksInput("");
-      alert("Job Sheet Cancelled ✅");
+      showToast("Job Sheet Cancelled", "success");
+      fetchJobStats(); // status maarina odane top stats refresh aagum
     } catch (err) {
       console.error(err);
-      alert(err.response?.data?.message || "Cancel failed ❌");
+      showToast(err.response?.data?.message || "Cancel failed", "error");
     } finally {
       setCancelling(false);
     }
   };
-  /* ================= UPDATE ================= */
-  const handleUpdate = async () => {
-    console.log("=== DEBUG ===");
-    console.log("advanceDate:", advanceDate);
-    console.log("advanceAmount:", advanceAmount);
 
+  /* ================= SEND WHATSAPP (NEW) =================
+     Manual re-send of the current Device Status message. Hits a dedicated backend
+     endpoint (POST /api/jobsheets/:id/send-whatsapp) which looks up the job's current
+     customer + status and fires sendJobStatusWhatsApp() itself — so this button always
+     sends whatever status is currently SAVED in the DB, not whatever is unsaved in the
+     form. If there are unsaved changes, prompt the user to Update first. */
+  const [sendingWhatsApp, setSendingWhatsApp] = useState(false);
+  const handleSendWhatsApp = async () => {
+    if (!localEditData?._id) {
+      showToast("Please save Job Sheet first", "warning");
+      return;
+    }
+    setSendingWhatsApp(true);
+    try {
+      const res = await axios.post(`${API}/api/jobsheets/${localEditData._id}/send-whatsapp`);
+      showToast(res.data?.message || "WhatsApp message sent", "success");
+    } catch (err) {
+      console.error(err);
+      showToast(err.response?.data?.message || "Failed to send WhatsApp message", "error");
+    } finally {
+      setSendingWhatsApp(false);
+    }
+  };
+
+  /* ================= UPDATE ================= */
+  // ================= DUPLICATE-SUBMIT GUARD (NEW) =================
+  // 🔴 ROOT CAUSE OF THE JS-598 6x DUPLICATE BUG: this function previously had ZERO
+  // protection against being called twice — no state guard, no ref guard, no disabled
+  // button while the request was in flight. If "Update" got clicked twice quickly
+  // (slow network, accidental double tap, or a stuck spinner tempting a second click),
+  // two PUT /api/jobsheets/:id requests fired at almost the same instant. Both read the
+  // SAME "before" revenueEntries from the DB, both computed their own "today's entry",
+  // and both wrote it back — the second write didn't know about the first, so instead
+  // of one row for the day you got extra duplicate rows. Guarding here with a
+  // synchronous ref (updatingRef) closes that race window completely — the second
+  // click is rejected before any network call is even made.
+  const handleUpdate = async () => {
+    if (updating || updatingRef.current) return;
+    updatingRef.current = true;
+    setUpdating(true);
+
+    try {
     if (!validateAll()) { window.scrollTo({ top: 0, behavior: "smooth" }); return; }
     if (repairDate && deliveryDate && new Date(deliveryDate) < new Date(repairDate)) {
-      alert("⚠️ Delivery Date cannot be before Repair Date"); return;
+      showToast("Delivery Date cannot be before Repair Date", "warning");
+      return;
     }
 
-    // ✅ Income date logic: if Income was actually changed this session (compared to what
-    // was loaded), stamp today's date. Otherwise keep whatever incomeDate already existed.
-    const todayStr = new Date().toISOString().slice(0, 10);
+    // Income date logic (priority order):
+    //   1. If user manually picked a date in the Income Date field → use that, always.
+    //   2. Else if Income amount actually changed this session → auto-stamp today.
+    //   3. Else keep whatever incomeDate already existed (or today if none yet).
+    const todayStr = new Date().toLocaleDateString("en-CA");
     const incomeNum = Number(income || 0);
-    const incomeChanged = incomeNum !== Number(initialIncomeRef.current || 0);
     const finalIncomeDate = incomeNum > 0
-      ? (incomeChanged ? todayStr : (incomeDate || todayStr))
+      ? (incomeDate || todayStr)
       : "";
-
     try {
       const formData = new FormData();
       formData.append("jobSheetNo", jobSheetNo);
-      formData.append("customer", JSON.stringify({ name: customerName, contact, altContact, address, email }));
-      formData.append("device", JSON.stringify({ make: make === "__custom" ? customMake : make, model: model === "__custom" ? customModel : model, imei, warranty, pattern, mobileStatus }));
+      formData.append("customer", JSON.stringify({ name: customerName, contact, altContact, email, district, taluk }));
+      formData.append("device", JSON.stringify({ make: make === "__custom" ? customMake : make, model: model === "__custom" ? customModel : model, imei: isDeadPhone ? "DEAD" : imei, warranty, pattern, mobileStatus }));
       formData.append("physicalCondition", JSON.stringify(physicalCondition.filter(v => v !== "__custom")));
       formData.append("accessories", JSON.stringify(accessories.filter(v => v !== "__custom")));
       formData.append("advanceItems", JSON.stringify(advanceItems));
       formData.append("visualIssues", JSON.stringify(visualIssues.filter(Boolean)));
-      formData.append("service", JSON.stringify({
-        engineer,
-        dealer, drawer, serviceRep,
-        serviceCharge: Number(serviceCharge || 0),
-        spareCharge: Number(spareCharge || 0),
-        income: incomeNum,
-        incomeDate: finalIncomeDate, // ✅ NEW
+    formData.append("service", JSON.stringify({
+  engineer,
+  dealer, drawer, serviceRep,
+  serviceCharge: Number(serviceCharge || 0),
+  spareCharge: Number(spareCharge || 0),
+  spareBaseline: spareBaselineRef.current,   // 👈 இந்த ஒரு line add பண்ணு
+    advanceBaseline: advanceBaselineRef.current, 
+    othersBaseline: othersBaselineRef.current,   // ✅ NEW
+  income: incomeNum,
+  incomeDate: finalIncomeDate,
 
-        othersAmount: Number(othersAmount || 0),
-        othersItems,
-        paymentMode, repairDate, deliveryDate,
-        instaFollowers, googleReview,
-        advanceAmount: Number(advanceAmount || 0),
-        advanceDate,
-        margin: Number(margin || 0),
-        remarks,
-      }));
+  othersAmount: Number(othersAmount || 0),
+  othersItems,
+  paymentMode, repairDate, deliveryDate,
+  instaFollowers, googleReview,
+  advanceAmount: Number(advanceAmount || 0),
+  advanceDate,
+  margin: Number(margin || 0),
+  remarks,
+}));
       formData.append("spareItems", JSON.stringify(spareItems));
       formData.append("idProofType", idProofType);
       if (idProofImage && typeof idProofImage !== "string") {
@@ -668,15 +1174,23 @@ const JobSheetPage = ({ editData = null, isEdit = false }) => {
         setAdvanceDate(updatedJob.service.advanceDate.slice(0, 10));
       }
 
-      // ✅ sync incomeDate + baseline after a successful update
+      // sync incomeDate + baseline after a successful update
       setIncomeDate(finalIncomeDate);
       initialIncomeRef.current = incomeNum;
 
-      alert("Job Sheet Updated ✅");
+      showToast("Job Sheet Updated", "success");
+      fetchJobStats(); // status/income maarina odane top stats refresh aagum
 
     } catch (err) {
       console.error(err);
-      alert("Update failed ❌");
+      showToast("Update failed", "error");
+    }
+    } finally {
+      // ✅ always release the guard, whether Update succeeded, failed validation,
+      // failed the date check, or the API call itself failed — otherwise a single
+      // failed attempt would permanently lock the button.
+      updatingRef.current = false;
+      setUpdating(false);
     }
   };
 
@@ -684,52 +1198,61 @@ const JobSheetPage = ({ editData = null, isEdit = false }) => {
 
   const handleSave = async () => {
 
-    if (saving) return;
+    // ================= DUPLICATE-SUBMIT GUARD (STRENGTHENED) =================
+    // Old code only checked `if (saving) return;` — state-only guard, vulnerable to the
+    // same "two clicks in the same tick both see old state" race explained above. Now
+    // checks the ref FIRST (synchronous, instant) before falling back to state.
+    if (saving || savingRef.current) return;
+    savingRef.current = true;
 
     if (!validateAll()) {
+      savingRef.current = false;
       window.scrollTo({ top: 0, behavior: "smooth" });
       return;
     }
     if (repairDate && deliveryDate && new Date(deliveryDate) < new Date(repairDate)) {
-      alert("⚠️ Delivery Date cannot be before Repair Date");
+      savingRef.current = false;
+      showToast("Delivery Date cannot be before Repair Date", "warning");
       return;
     }
 
     setSaving(true);
 
-   const user = JSON.parse(sessionStorage.getItem("user") || "null");
+    const user = JSON.parse(sessionStorage.getItem("user") || "null");
 
-if (!user || !user.username) {
-  alert("⚠️ Session expired! Please logout and login again, then try saving.");
-  setSaving(false);
-  return;
-}
+    if (!user || !user.username) {
+      showToast("Session expired! Please logout and login again, then try saving.", "error");
+      setSaving(false);
+      savingRef.current = false;
+      return;
+    }
 
-    // ✅ New job sheet: if Income has a value, today is the income date.
-    const todayStr = new Date().toISOString().slice(0, 10);
+    // New job sheet: if user manually picked a date, use it; otherwise auto = today
+    // (only when Income has a value).
+       const todayStr = new Date().toLocaleDateString("en-CA");
     const incomeNum = Number(income || 0);
-    const finalIncomeDate = incomeNum > 0 ? todayStr : "";
+    const finalIncomeDate = incomeNum > 0
+      ? (incomeDate || todayStr)
+      : "";
 
     try {
       const formData = new FormData();
       formData.append("jobSheetNo", jobSheetNo);
-      formData.append("customer", JSON.stringify({ name: customerName, contact, altContact, address, email }));
-      formData.append("device", JSON.stringify({ make: make === "__custom" ? customMake : make, model: model === "__custom" ? customModel : model, imei, warranty, pattern, mobileStatus }));
+      formData.append("customer", JSON.stringify({ name: customerName, contact, altContact, email, district, taluk }));
+      formData.append("device", JSON.stringify({ make: make === "__custom" ? customMake : make, model: model === "__custom" ? customModel : model, imei: isDeadPhone ? "DEAD" : imei, warranty, pattern, mobileStatus }));
       formData.append("physicalCondition", JSON.stringify(physicalCondition.filter(v => v !== "__custom")));
       formData.append("accessories", JSON.stringify(accessories.filter(v => v !== "__custom")));
       formData.append("advanceItems", JSON.stringify(advanceItems));
       formData.append("visualIssues", JSON.stringify(visualIssues.filter(Boolean)));
       formData.append("service", JSON.stringify({
         engineer,
-
-
         dealer, drawer, serviceRep,
         instaFollowers,
         googleReview, advanceDate,
         serviceCharge: Number(serviceCharge || 0),
         spareCharge: Number(spareCharge || 0),
         income: incomeNum,
-        incomeDate: finalIncomeDate, // ✅ NEW
+        incomeDate: finalIncomeDate,
 
         othersAmount: Number(othersAmount || 0),
         othersItems,
@@ -740,39 +1263,42 @@ if (!user || !user.username) {
       formData.append("spareItems", JSON.stringify(spareItems));
       formData.append("idProofType", idProofType);
       if (idProofImage) formData.append("idProofImage", idProofImage);
-     formData.append("createdBy", JSON.stringify({ username: user.username, role: user.role }));
+      formData.append("createdBy", JSON.stringify({ username: user.username, role: user.role }));
 
       const res = await axios.post(`${API}/api/jobsheets`, formData, {
         headers: { "Content-Type": "multipart/form-data" }
       });
 
-      alert("Job Sheet Saved ✅");
+      showToast("Job Sheet Saved", "success");
+      fetchJobStats(); // puthu job sheet — top stats refresh aagum
 
       const next = await axios.get(`${API}/api/jobsheets/next-number`);
       handleNew(next.data.next);
 
     } catch (err) {
       console.error(err);
-      alert("Save failed ❌");
+      showToast("Save failed", "error");
     } finally {
       setSaving(false);
+      savingRef.current = false;
     }
   };
-  console.log("advanceItems being saved:", advanceItems);
-  console.log("advanceAmount:", advanceAmount);
+
   const handleNew = (nextNo = null) => {
     setCustomerName("");
 
     setContact("");
     setAltContact("");
-    setAddress("");
     setEmail("");
+    setDistrict("");
+    setTaluk("");
     setServiceRep("");
     setMake("");
     setCustomMake("");
     setModel("");
     setCustomModel("");
     setImei("");
+    setIsDeadPhone(false);
     setWarranty("");
     setPattern("");
     setIdProofType("");
@@ -797,9 +1323,13 @@ if (!user || !user.username) {
     setSpareCharge("");
     setOthersAmount("");
     setOthersItems([]);
-    setSpareItems([]);
+       setSpareItems([]);
+    spareBaselineRef.current = 0;
+    advanceBaselineRef.current = 0;   // ✅ NEW
+    othersBaselineRef.current = 0;    // ✅ NEW
     setIncome("");
     setIncomeDate("");
+    setIncomeDateTouched(false); // reset manual-pick flag on New
     initialIncomeRef.current = 0;
     setPaymentMode("");
     setRemarks("");
@@ -808,8 +1338,7 @@ if (!user || !user.username) {
     setTouched({});
     setFormErrors({});
 
-
-    const today = new Date().toISOString().split("T")[0];
+const today = new Date().toLocaleDateString("en-CA");
     setRepairDate(today);
     setDeliveryDate("");
 
@@ -829,14 +1358,24 @@ if (!user || !user.username) {
     setCustomerName(editData.customer?.name || "");
     setContact(editData.customer?.contact || "");
     setAltContact(editData.customer?.altContact || "");
-    setAddress(editData.customer?.address || "");
     setEmail(editData.customer?.email || "");
+    setDistrict(editData.customer?.district || "");
+    setTaluk(editData.customer?.taluk || "");
     setServiceRep(editData.service?.serviceRep || "");
     setInstaFollowers(editData.service?.instaFollowers || "");
     setGoogleReview(editData.service?.googleReview || "");
     setMake(editData.device?.make || "");
     setModel(editData.device?.model || "");
-    setImei(editData.device?.imei || "");
+    // ================= DEAD PHONE — restore from saved value =================
+    // If the stored IMEI is literally "DEAD", the checkbox comes back checked and
+    // the visible IMEI input stays blank instead of showing "DEAD" as a value.
+    if (editData.device?.imei === "DEAD") {
+      setIsDeadPhone(true);
+      setImei("");
+    } else {
+      setIsDeadPhone(false);
+      setImei(editData.device?.imei || "");
+    }
     setWarranty(editData.device?.warranty || "");
     setPattern(editData.device?.pattern || "");
     setIdProofType(editData.device?.idProofType || "");
@@ -859,17 +1398,27 @@ if (!user || !user.username) {
     setDealer(editData.service?.dealer || "");
     setDrawer(editData.service?.drawer || "");
     setServiceCharge(editData.service?.serviceCharge || "");
-    setSpareCharge(editData.service?.spareCharge || "");
+           setSpareCharge(editData.service?.spareCharge || "");
     setSpareItems(editData.spareItems || []);
+    // ✅ FIX — always trust the baseline stored in DB (set at rebill time).
+    // rebillPending only tracks whether "Save Rebill" was clicked yet —
+    // it does NOT mean the cycle has changed. Resetting baseline to 0 when
+    // rebillPending turns false was wiping out the correct baseline on
+    // every reopen after the first save, causing the full cumulative spare
+    // total to count as "current cycle" instead of just the new spares.
+    spareBaselineRef.current = Number(editData.service?.spareBaseline || 0);
+    advanceBaselineRef.current = Number(editData.service?.advanceBaseline || 0); 
+     othersBaselineRef.current = Number(editData.service?.othersBaseline || 0);
     setOthersAmount(editData.service?.othersAmount || "");
     setOthersItems(editData.service?.othersItems || []);
     setIncome(editData.service?.income || "");
-    // ✅ NEW — load incomeDate + baseline for change-detection
+    // load incomeDate + baseline for change-detection
     setIncomeDate(
       editData.service?.incomeDate
         ? new Date(editData.service.incomeDate).toISOString().slice(0, 10)
         : ""
     );
+    setIncomeDateTouched(false); // reset — opening an existing sheet is not a "manual pick"
     initialIncomeRef.current = Number(editData.service?.income || 0);
     setPaymentMode(editData.service?.paymentMode || "");
     setRepairDate(editData.service?.repairDate?.slice(0, 10) || today);
@@ -930,7 +1479,7 @@ if (!user || !user.username) {
       setShowSearchModal(true);
     } catch (err) {
       console.error(err);
-      alert("Search failed");
+      showToast("Search failed", "error");
     } finally {
       setSearching(false);
     }
@@ -969,8 +1518,32 @@ if (!user || !user.username) {
     ...extraModel,
     { label: "Other (Add New)", value: "__custom" }
   ];
-  /* ── WORKLOAD BADGE HELPER ── */
-;
+
+  /* ================= DISTRICT / TALUK OPTIONS =================
+     Plain list straight from the DB — same "extra"-entry fallback as Make/Model so a saved
+     district/taluk from an older job sheet still shows up selected even if it's since been
+     renamed/removed from the master list. No "Other (Add New)" here — District/Taluk are
+     only added/edited/deleted from the sidebar's Data Operation popup. */
+  const districtNames = districtList.map(d => typeof d === "string" ? d : d.name);
+  const extraDistrict =
+    district && !districtNames.includes(district)
+      ? [{ label: district, value: district }]
+      : [];
+  const districtOptions = [
+    ...districtNames.map(name => ({ label: name, value: name })),
+    ...extraDistrict,
+  ];
+
+  const talukNames = talukList.map(t => typeof t === "string" ? t : t.name);
+  const extraTaluk =
+    taluk && !talukNames.includes(taluk)
+      ? [{ label: taluk, value: taluk }]
+      : [];
+  const talukOptions = [
+    ...talukNames.map(name => ({ label: name, value: name })),
+    ...extraTaluk,
+  ];
+
   return (
     <div
       style={{ minHeight: "100vh", background: "#f6f7f9", display: "flex" }}
@@ -989,7 +1562,7 @@ if (!user || !user.username) {
       }}
     >
 
-      {/* ============ GLOBAL DARK TEXT / PLACEHOLDER STYLES ============ */}
+      {/* ============ GLOBAL DARK TEXT / PLACEHOLDER STYLES + VALIDATION ANIMATIONS ============ */}
       <style>{`
         .form-control, .form-select {
           color: #111827 !important;
@@ -1005,7 +1578,37 @@ if (!user || !user.username) {
         .form-control:disabled, .form-select:disabled {
           color: #6B7280 !important;
         }
+
+        /* Modern invalid/valid field styling — soft glow instead of a hard red box,
+           plus a tiny shake the moment a field becomes invalid so it draws the eye. */
+        .form-control.is-invalid, .form-select.is-invalid {
+          border-color: ${RED} !important;
+          box-shadow: 0 0 0 3px rgba(220,38,38,0.10) !important;
+          animation: fieldShake 0.35s ease;
+        }
+        .form-control.is-valid, .form-select.is-valid {
+          border-color: #16A34A !important;
+          box-shadow: 0 0 0 3px rgba(22,163,74,0.10) !important;
+        }
+
+        @keyframes fieldShake {
+          10%, 90% { transform: translateX(-1px); }
+          20%, 80% { transform: translateX(2px); }
+          30%, 50%, 70% { transform: translateX(-3px); }
+          40%, 60% { transform: translateX(3px); }
+        }
+        @keyframes fieldMsgIn {
+          from { opacity: 0; transform: translateY(-4px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes toastIn {
+          from { opacity: 0; transform: translateX(24px) scale(0.98); }
+          to { opacity: 1; transform: translateX(0) scale(1); }
+        }
       `}</style>
+
+      {/* ============ TOAST NOTIFICATIONS (replaces window.alert everywhere) ============ */}
+      <ToastContainer toasts={toasts} onDismiss={dismissToast} />
 
       {/* ============ LEFT SIDEBAR ============ */}
       <JobSheetSidebar />
@@ -1052,6 +1655,40 @@ if (!user || !user.username) {
         </div>
 
         <div className="container-fluid" style={{ padding: "14px 18px" }}>
+
+          {/* ============ TOP STATS BAR — Pending / In Process / Delivered / Total Revenue ============ */}
+          <div className="row g-2 mb-2">
+            <StatCard
+              label="Total"
+              value={statsLoading ? "…" : jobStats.total}
+              icon={<FileText size={16} color="#fff" />}
+              bg="#334155"
+            />
+            <StatCard
+              label="Pending"
+              value={statsLoading ? "…" : jobStats.pending}
+              icon={<Clock size={16} color="#fff" />}
+              bg="#F59E0B"
+            />
+            <StatCard
+              label="In Process"
+              value={statsLoading ? "…" : jobStats.inProcess}
+              icon={<Cog size={16} color="#fff" />}
+              bg="#2563EB"
+            />
+            <StatCard
+              label="Delivered"
+              value={statsLoading ? "…" : jobStats.delivered}
+              icon={<CheckCircle2 size={16} color="#fff" />}
+              bg="#16A34A"
+            />
+            <StatCard
+              label="Total Revenue"
+              value={statsLoading ? "…" : `₹${jobStats.totalRevenue.toLocaleString("en-IN")}`}
+              icon={<IndianRupee size={16} color="#fff" />}
+              bg="#7C3AED"
+            />
+          </div>
 
           {/* Job Sheet Info Bar */}
 <div className="card" style={{ marginBottom: "6px", border: "1px solid #eee", padding: "5px 16px", borderRadius: 10, boxShadow: "none" }}>
@@ -1143,13 +1780,13 @@ if (!user || !user.username) {
             </div>
           </div>
 
-      {/* ============ MAIN GRID (REORDERED — NEW) ============ */}
+      {/* ============ MAIN GRID ============ */}
           <div className="row g-2">
 
             {/* MAIN COLUMN — Customer / Device / Service */}
             <div className="col-md-9">
 
-            {/* ===== NEW: Customer Details + Device Details side by side ===== */}
+            {/* ===== Customer Details + Device Details side by side ===== */}
             <div className="row g-2 mb-2 align-items-start">
 
               <div className="col-md-6">
@@ -1164,12 +1801,11 @@ if (!user || !user.username) {
                       <CustomerAutocomplete
                         type="name"
                         value={customerName}
-                        onChange={setCustomerName}
+                        onChange={(val) => handleLiveChange("customerName", val, setCustomerName)}
                         onSelect={(customer) => {
                           setCustomerName(customer.name || "");
                           setContact(customer.contact || "");
                           setAltContact(customer.altContact || "");
-                          setAddress(customer.address || "");
                           setEmail(customer.email || "");
                           setInstaFollowers(customer.instaFollowers === "Already Done" ? "Already Done" : "");
                           setGoogleReview(customer.googleReview === "Already Done" ? "Already Done" : "");
@@ -1180,12 +1816,13 @@ if (!user || !user.username) {
                             touched.customerName && !formErrors.customerName ? "is-valid" : ""
                           }`}
                         inputProps={{
-                          onBlur: () => handleBlur("customerName", customerName)
+                          onBlur: () => handleBlur("customerName", customerName),
+                          spellCheck: true
                         }}
                       />
                       </Field>
                       {touched.customerName && formErrors.customerName && (
-                        <div className="invalid-feedback d-block" style={{ fontSize: 11 }}>⚠️ {formErrors.customerName}</div>
+                        <FieldError>{formErrors.customerName}</FieldError>
                       )}
                     </div>
 
@@ -1194,13 +1831,12 @@ if (!user || !user.username) {
                       <CustomerAutocomplete
                         type="contact"
                         value={contact}
-                        onChange={setContact}
+                        onChange={(val) => handleLiveChange("contact", val, setContact)}
                         filterNumbers={true}
                         onSelect={(customer) => {
                           setCustomerName(customer.name || "");
                           setContact(customer.contact || "");
                           setAltContact(customer.altContact || "");
-                          setAddress(customer.address || "");
                           setEmail(customer.email || "");
                           setInstaFollowers(customer.instaFollowers === "Already Done" ? "Already Done" : "");
                           setGoogleReview(customer.googleReview === "Already Done" ? "Already Done" : "");
@@ -1217,10 +1853,10 @@ if (!user || !user.username) {
                       />
                       </Field>
                       {touched.contact && formErrors.contact && (
-                        <div className="invalid-feedback d-block" style={{ fontSize: 11 }}>⚠️ {formErrors.contact}</div>
+                        <FieldError>{formErrors.contact}</FieldError>
                       )}
                       {touched.contact && !formErrors.contact && contact && (
-                        <div style={{ fontSize: 11, color: "#198754" }}> Valid number</div>
+                        <FieldSuccess>Valid number</FieldSuccess>
                       )}
                     </div>
 
@@ -1235,16 +1871,80 @@ if (!user || !user.username) {
                       />
                       </Field>
                     </div>
+
+                    {/* ================= DISTRICT / TALUK — MANDATORY + SEARCHABLE + BACKEND-DRIVEN =================
+                        MD sir kekkittaru: reception-la address vaangumbodhe District &
+                        Taluk-um select pannanum, apparam Excel download report-la
+                        district/taluk wise filter panna mudiyum. Searchable react-select
+                        vechirukken (Make/Model madhiri) — type pannalum list-la jump aagum.
+                        Master lists backend-la irukku (District/Taluk collections), aana
+                        adding/editing/deleting reception-la illa — sidebar "Data Operation" →
+                        District/Taluk popup-la mattum thaan (admin-only). Taluk list District
+                        select panna mattum thaan varum. */}
                     <div className="col-md-6">
-                      <Field label="Customer Address">
-                      <textarea
-                        rows="2"
-                        className="form-control form-control-sm"
-                        placeholder="Address"
-                        value={address}
-                        onChange={(e) => setAddress(e.target.value)}
-                      />
+                      <Field label="District" required>
+                        <Select
+                          options={districtOptions}
+                          value={district ? { label: district, value: district } : null}
+                          onChange={(selected) => {
+                            const val = selected?.value || "";
+                            setDistrict(val);
+                            setTaluk(""); // district maarina taluk reset aagum
+                            if (touched.district)
+                              setFormErrors(prev => ({ ...prev, district: validateField("district", val) }));
+                          }}
+                          onBlur={() => handleBlur("district", district)}
+                          placeholder="Search District..."
+                          isClearable
+                          filterOption={fuzzyFilterOption}
+                          menuPortalTarget={document.body}
+                          styles={{
+                            ...selectCompactText,
+                            menuPortal: (base) => ({ ...base, zIndex: 9999 }),
+                            control: (base, state) => ({
+                              ...selectCompactText.control(base, state),
+                              borderColor: touched.district && formErrors.district ? RED : "#CBD5E1",
+                              boxShadow: touched.district && formErrors.district ? "0 0 0 3px rgba(220,38,38,0.10)" : base.boxShadow,
+                            }),
+                          }}
+                        />
                       </Field>
+                      {touched.district && formErrors.district && (
+                        <FieldError>{formErrors.district}</FieldError>
+                      )}
+                    </div>
+
+                    <div className="col-md-6">
+                      <Field label="Taluk" required>
+                        <Select
+                          options={talukOptions}
+                          value={taluk ? { label: taluk, value: taluk } : null}
+                          onChange={(selected) => {
+                            const val = selected?.value || "";
+                            setTaluk(val);
+                            if (touched.taluk)
+                              setFormErrors(prev => ({ ...prev, taluk: validateField("taluk", val) }));
+                          }}
+                          onBlur={() => handleBlur("taluk", taluk)}
+                          placeholder={district ? "Search Taluk..." : "Select District first"}
+                          isClearable
+                          isDisabled={!district}
+                          filterOption={fuzzyFilterOption}
+                          menuPortalTarget={document.body}
+                          styles={{
+                            ...selectCompactText,
+                            menuPortal: (base) => ({ ...base, zIndex: 9999 }),
+                            control: (base, state) => ({
+                              ...selectCompactText.control(base, state),
+                              borderColor: touched.taluk && formErrors.taluk ? RED : "#CBD5E1",
+                              boxShadow: touched.taluk && formErrors.taluk ? "0 0 0 3px rgba(220,38,38,0.10)" : base.boxShadow,
+                            }),
+                          }}
+                        />
+                      </Field>
+                      {touched.taluk && formErrors.taluk && (
+                        <FieldError>{formErrors.taluk}</FieldError>
+                      )}
                     </div>
 
                     <div className="col-md-6">
@@ -1266,10 +1966,10 @@ if (!user || !user.username) {
                       />
                       </Field>
                       {touched.email && formErrors.email && (
-                        <div className="invalid-feedback d-block" style={{ fontSize: 11 }}>⚠️ {formErrors.email}</div>
+                        <FieldError>{formErrors.email}</FieldError>
                       )}
                       {touched.email && !formErrors.email && email && (
-                        <div style={{ fontSize: 11, color: "#198754" }}> Valid email</div>
+                        <FieldSuccess>Valid email</FieldSuccess>
                       )}
                     </div>
 
@@ -1315,6 +2015,7 @@ if (!user || !user.username) {
                         }}
                         placeholder="Search "
                         isClearable
+                        filterOption={fuzzyFilterOption}
                         styles={{
                           ...selectCompactText,
                           menuPortal: (base) => ({ ...base, zIndex: 9999 }),
@@ -1322,10 +2023,6 @@ if (!user || !user.username) {
                         menuPortalTarget={document.body}
                       />
                       </Field>
-                      {/* ================= MAKE ADD-NEW (UPDATED) =================
-                          Was a plain input that only set customMake locally. Now has an
-                          "Add" button (same pattern as Physical Condition/Accessories) that
-                          POSTs to /api/makes so the Make actually appears in future dropdowns. */}
                       {make === "__custom" && (
                         <div className="d-flex gap-1 mt-2">
                           <input
@@ -1334,6 +2031,7 @@ if (!user || !user.username) {
                             value={customMake}
                             onChange={(e) => setCustomMake(e.target.value)}
                             onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleAddCustomMake(); } }}
+                            spellCheck="true"
                           />
                           <button
                             type="button"
@@ -1359,6 +2057,7 @@ if (!user || !user.username) {
                         }}
                         placeholder="Search"
                         isClearable
+                        filterOption={fuzzyFilterOption}
                         styles={{
                           ...selectCompactText,
                           menuPortal: (base) => ({ ...base, zIndex: 9999 }),
@@ -1366,9 +2065,6 @@ if (!user || !user.username) {
                         menuPortalTarget={document.body}
                       />
                       </Field>
-                      {/* ================= MODEL ADD-NEW (UPDATED) =================
-                          Same fix as Make — POSTs { name, make } to /api/models so the model
-                          master list actually grows and shows up in the next job sheet's search. */}
                       {model === "__custom" && (
                         <div className="d-flex gap-1 mt-2">
                           <input
@@ -1377,6 +2073,7 @@ if (!user || !user.username) {
                             value={customModel}
                             onChange={(e) => setCustomModel(e.target.value)}
                             onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleAddCustomModel(); } }}
+                            spellCheck="true"
                           />
                           <button
                             type="button"
@@ -1391,16 +2088,51 @@ if (!user || !user.username) {
                       )}
                     </div>
 
+                    {/* ================= IMEI — NOW MANDATORY + "DEAD PHONE" ESCAPE HATCH (NEW) =================
+                        IMEI is required by default. If the phone is completely dead and IMEI
+                        can't be read, the "Dead Phone" checkbox below disables the input,
+                        clears any typed value, and skips the mandatory check — device.imei is
+                        saved as "DEAD" so reports can still tell these apart from a normal entry. */}
                     <div className="col-md-6">
-                      <Field label="IMEI Number" required>
+                      <Field label="IMEI Number" required={!isDeadPhone}>
                       <input
-                        className="form-control form-control-sm"
+                        className={`form-control form-control-sm ${touched.imei && formErrors.imei ? "is-invalid" :
+                            touched.imei && !formErrors.imei && imei ? "is-valid" : ""
+                          }`}
                         placeholder="15-digit IMEI"
                         value={imei}
                         maxLength={15}
-                        onChange={(e) => setImei(onlyNumbers(e.target.value))}
+                        disabled={isDeadPhone}
+                        onChange={(e) => {
+                          const val = onlyNumbers(e.target.value);
+                          setImei(val);
+                          if (touched.imei)
+                            setFormErrors(prev => ({ ...prev, imei: validateField("imei", val) }));
+                        }}
+                        onBlur={() => handleBlur("imei", imei)}
                       />
                       </Field>
+                      {touched.imei && formErrors.imei && (
+                        <FieldError>{formErrors.imei}</FieldError>
+                      )}
+                      <div style={{ marginTop: 6, display: "flex", alignItems: "center", gap: 6 }}>
+                        <input
+                          type="checkbox"
+                          id="deadPhoneCheck"
+                          checked={isDeadPhone}
+                          onChange={(e) => {
+                            const checked = e.target.checked;
+                            setIsDeadPhone(checked);
+                            if (checked) {
+                              setImei("");
+                              setFormErrors(prev => ({ ...prev, imei: "" }));
+                            }
+                          }}
+                        />
+                        <label htmlFor="deadPhoneCheck" style={{ fontSize: 12, color: "#6B7280", cursor: "pointer", margin: 0 }}>
+                          Dead Phone (No IMEI available)
+                        </label>
+                      </div>
                     </div>
 
                     <div className="col-md-6">
@@ -1510,6 +2242,7 @@ if (!user || !user.username) {
                               const val = e.target.value.replace(/[^a-zA-Z\u0B80-\u0BFF\s.]/g, "");
                               setDealer(val);
                             }}
+                            spellCheck="true"
                           />
                         </Field>
                       </div>
@@ -1530,13 +2263,20 @@ if (!user || !user.username) {
                           </select>
                         </Field>
                       </div>
-
                       <div className="col-md-6">
-                        <Field label="Service Rep">
+                        <Field label="Service Rep" required>
                           <select
-                            className="form-select form-select-sm"
+                            className={`form-select form-select-sm ${touched.serviceRep && formErrors.serviceRep ? "is-invalid" :
+                                touched.serviceRep && !formErrors.serviceRep && serviceRep ? "is-valid" : ""
+                              }`}
                             value={serviceRep}
-                            onChange={e => setServiceRep(e.target.value)}
+                            onChange={e => {
+                              const val = e.target.value;
+                              setServiceRep(val);
+                              if (touched.serviceRep)
+                                setFormErrors(prev => ({ ...prev, serviceRep: validateField("serviceRep", val) }));
+                            }}
+                            onBlur={() => handleBlur("serviceRep", serviceRep)}
                           >
                             <option value="">Service Rep</option>
                             {salesRepList.map((rep, i) => (
@@ -1546,8 +2286,10 @@ if (!user || !user.username) {
                             ))}
                           </select>
                         </Field>
+                        {touched.serviceRep && formErrors.serviceRep && (
+                          <FieldError>{formErrors.serviceRep}</FieldError>
+                        )}
                       </div>
-
                       <div className="col-md-6">
                         <Field label="Repair Date">
                           <input
@@ -1611,19 +2353,57 @@ if (!user || !user.username) {
                     </div>
                     <div className="card-body row g-2" style={{ padding: "8px 12px" }}>
 
+                      {/* ================= INCOME ₹ + INCOME DATE — merged into one box =================
+                          Was two separate fields (Income ₹ / Income Date). Now a single
+                          form-control-styled box: the amount input sits on the left and a
+                          calendar icon sits in the right corner. Clicking the icon opens the
+                          native date picker (showPicker()) so the date is picked without a
+                          second box taking up a whole grid column. */}
                       <div className="col-md-6">
                         <Field label="Income ₹">
-                          <input
-                            className="form-control form-control-sm"
-                            placeholder="0"
-                            value={income}
-                            onChange={(e) => setIncome(onlyNumbers(e.target.value))}
-                          />
+                          <div
+                            className="form-control form-control-sm d-flex align-items-center"
+                            style={{ padding: "0 6px", gap: 6, position: "relative" }}
+                          >
+                            <input
+                              type="text"
+                              placeholder="0"
+                              value={income}
+                              onChange={(e) => setIncome(onlyNumbers(e.target.value))}
+                              style={{
+                                border: "none", outline: "none", flex: 1, minWidth: 0,
+                                background: "transparent", padding: "4px 2px",
+                                color: "#111827", fontWeight: 500,
+                              }}
+                            />
+                            <Calendar
+                              size={15}
+                              style={{ color: incomeDate ? "#0d6efd" : "#6B7280", cursor: "pointer", flexShrink: 0 }}
+                              onClick={() => {
+                                const el = incomeDateRef.current;
+                                if (el?.showPicker) el.showPicker();
+                                else el?.focus();
+                              }}
+                            />
+                            <input
+                              ref={incomeDateRef}
+                              type="date"
+                              value={incomeDate}
+                              onChange={(e) => {
+                                setIncomeDate(e.target.value);
+                                setIncomeDateTouched(true); // user manually chose → this wins
+                              }}
+                              style={{
+                                position: "absolute", top: 0, right: 0,
+                                width: 1, height: 1, opacity: 0,
+                                border: "none", padding: 0, pointerEvents: "none",
+                              }}
+                            />
+                          </div>
                         </Field>
-                        {/* ✅ NEW — shows the date this income was recorded (used by Income Report) */}
                         {incomeDate && (
                           <div style={{ fontSize: 10, color: "#0d6efd", marginTop: 2, fontWeight: 500 }}>
-                            📅 Income recorded on {incomeDate}
+                            📅 {incomeDateTouched ? "Manually selected" : "Auto-recorded"}: {incomeDate}
                           </div>
                         )}
                       </div>
@@ -1641,27 +2421,34 @@ if (!user || !user.username) {
                         </Field>
                       </div>
 
-                      <div className="col-md-6">
-                        <Field label="Spare Charges ">
-                          <input
-                            type="text"
-                            className="form-control form-control-sm"
-                            placeholder="Tap to add "
-                            value={spareCharge}
-                            readOnly
-                            onClick={() => setSparePopup(true)}
-                            style={{ cursor: "pointer", background: "#f8f9fa" }}
-                          />
-                        </Field>
-                      </div>
-
+                    <div className="col-md-6">
+  <Field label="Spare Charges ">
+    <input
+      type="text"
+      className="form-control form-control-sm"
+      placeholder="Tap to add "
+      value={
+        Math.max(0, Number(spareCharge || 0) - spareBaselineRef.current) > 0
+          ? Math.max(0, Number(spareCharge || 0) - spareBaselineRef.current)
+          : ""
+      }
+      readOnly
+      onClick={() => setSparePopup(true)}
+      style={{ cursor: "pointer", background: "#f8f9fa" }}
+    />
+  </Field>
+</div>
                       <div className="col-md-6">
                         <Field label="Other Expenses">
                           <input
                             type="text"
                             className="form-control form-control-sm"
                             placeholder="Tap to add"
-                            value={othersAmount}
+                            value={
+                              Math.max(0, Number(othersAmount || 0) - othersBaselineRef.current) > 0
+                                ? Math.max(0, Number(othersAmount || 0) - othersBaselineRef.current)
+                                : ""
+                            }
                             readOnly
                             onClick={() => setShowOthersPopup(true)}
                             style={{ cursor: "pointer", background: "#f8f9fa" }}
@@ -1673,19 +2460,22 @@ if (!user || !user.username) {
                           </div>
                         )}
                       </div>
-
-                      <div className="col-md-6">
-                        <Field label="Advance Amount ">
-                          <input
-                            type="text"
-                            className="form-control form-control-sm"
-                            placeholder="Tap to add"
-                            value={advanceAmount}
-                            readOnly
-                            onClick={() => setShowAdvancePopup(true)}
-                            style={{ cursor: "pointer", background: "#f8f9fa" }}
-                          />
-                        </Field>
+                     <div className="col-md-6">
+  <Field label="Advance Amount ">
+    <input
+      type="text"
+      className="form-control form-control-sm"
+      placeholder="Tap to add"
+      value={
+        Math.max(0, Number(advanceAmount || 0) - advanceBaselineRef.current) > 0
+          ? Math.max(0, Number(advanceAmount || 0) - advanceBaselineRef.current)
+          : ""
+      }
+      readOnly
+      onClick={() => setShowAdvancePopup(true)}
+      style={{ cursor: "pointer", background: "#f8f9fa" }}
+    />
+  </Field>
                         {advanceItems.length > 0 && (
                           <div style={{ fontSize: 10, color: "#0d6efd", marginTop: 2, fontWeight: 500, display: "flex", alignItems: "center", gap: 4 }}>
                             <Wallet size={11} /> {advanceItems.length} payment{advanceItems.length > 1 ? "s" : ""}
@@ -1716,6 +2506,7 @@ if (!user || !user.username) {
                             value={remarks}
                             onChange={(e) => setRemarks(e.target.value)}
                             style={{ height: "31px", resize: "none" }}
+                            spellCheck="true"
                           />
                         </Field>
                       </div>
@@ -1727,7 +2518,7 @@ if (!user || !user.username) {
               </div>
             </div>
 
-            {/* SIDE COLUMN — Visual Inspection → Physical Condition → Accessories (NEW ORDER, SELECT STYLE) */}
+            {/* SIDE COLUMN — Visual Inspection → Physical Condition → Accessories */}
             <div className="col-md-3">
 
             <div className="card shadow-sm mb-2" style={{ borderRadius: 10, overflow: "hidden" }}>
@@ -1766,6 +2557,7 @@ if (!user || !user.username) {
                         }}
                         placeholder="Search Issue..."
                         isClearable
+                        filterOption={fuzzyFilterOption}
                         menuPortalTarget={document.body}
                         styles={{
                           ...selectDarkText,
@@ -1773,10 +2565,6 @@ if (!user || !user.username) {
                         }}
                       />
                      
-                      {/* ================= FAULT ADD-NEW (UPDATED) =================
-                          Was a plain input that only updated this row's visualIssues entry.
-                          Now has an "Add" button that POSTs to /api/faults so the fault
-                          master list actually grows for future job sheets' search/dropdown. */}
                       {customFaults[i] !== undefined && (
                         <div className="d-flex gap-1 mt-2">
                           <input
@@ -1789,6 +2577,7 @@ if (!user || !user.username) {
                               updateIssue(i, val);
                             }}
                             onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleAddCustomFault(i); } }}
+                            spellCheck="true"
                           />
                           <button
                             type="button"
@@ -1819,18 +2608,25 @@ if (!user || !user.username) {
                     </div>
                   ))}
 
-                  {/* <button
-                    className="btn btn-sm w-100"
-                    style={{ background: RED_SOFT_BG, color: RED_TEXT, border: `1px solid ${RED_BORDER}`, fontWeight: 600 }}
+                  {/* ================= ADD MORE ISSUE (FIX) =================
+                      🔴 BUG FIX: addIssue() function already existed (pushes a new blank
+                      row into visualIssues), aana adha call panna oru button EHDUME
+                      UI-la illa — adhunala oru phone-ku multiple faults add panna
+                      mudiyaama, one issue mattum thaan select panna mudinjuchu. Idhu andha
+                      button. */}
+                  <button
+                    type="button"
+                    className="btn btn-sm w-100 mt-1"
+                    style={{ background: RED_SOFT_BG, color: RED_TEXT, fontWeight: 600, border: `1px dashed ${RED_BORDER}` }}
                     onClick={addIssue}
                   >
-                    <Plus size={14} /> Add Issue
-                  </button> */}
+                    <Plus size={14} style={{ marginRight: 4, verticalAlign: -2 }} /> Add More Issue
+                  </button>
 
                 </div>
               </div>
 
-              {/* PHYSICAL CONDITION — multi-select, backend-driven (UPDATED) */}
+              {/* PHYSICAL CONDITION — multi-select, backend-driven */}
              <div className="card shadow-sm mb-2" style={{ borderRadius: 10, overflow: "hidden" }}>
                 <div className="card-header d-flex align-items-center gap-2" style={redHeader}>
                   <Bandage size={16} /> Physical Condition
@@ -1844,6 +2640,7 @@ if (!user || !user.username) {
                     onChange={(selected) => setPhysicalCondition(selected ? selected.map(s => s.value) : [])}
                     placeholder="Select Physical"
                     isClearable
+                    filterOption={fuzzyFilterOption}
                     menuPortalTarget={document.body}
                     styles={{
                       ...selectDarkText,
@@ -1859,6 +2656,7 @@ if (!user || !user.username) {
                         value={customPhysicalConditionText}
                         onChange={(e) => setCustomPhysicalConditionText(e.target.value)}
                         onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleAddCustomPhysicalCondition(); } }}
+                        spellCheck="true"
                       />
                       <button
                         type="button"
@@ -1874,7 +2672,7 @@ if (!user || !user.username) {
                 </div>
               </div>
 
-              {/* ACCESSORIES — multi-select, backend-driven (UPDATED) */}
+              {/* ACCESSORIES — multi-select, backend-driven */}
               <div className="card shadow-sm" style={{ borderRadius: 10, overflow: "hidden" }}>
                 <div className="card-header d-flex align-items-center gap-2" style={redHeader}>
                   <Gift size={16} /> Accessories Received
@@ -1888,6 +2686,7 @@ if (!user || !user.username) {
                     onChange={(selected) => setAccessories(selected ? selected.map(s => s.value) : [])}
                     placeholder="Select Accessories..."
                     isClearable
+                    filterOption={fuzzyFilterOption}
                     menuPortalTarget={document.body}
                     styles={{
                       ...selectDarkText,
@@ -1903,6 +2702,7 @@ if (!user || !user.username) {
                         value={customAccessoryText}
                         onChange={(e) => setCustomAccessoryText(e.target.value)}
                         onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleAddCustomAccessory(); } }}
+                        spellCheck="true"
                       />
                       <button
                         type="button"
@@ -1958,6 +2758,7 @@ if (!user || !user.username) {
                       value={cancelRemarksInput}
                       onChange={(e) => setCancelRemarksInput(e.target.value)}
                       autoFocus
+                      spellCheck="true"
                     />
                   </div>
                   <div className="modal-footer">
@@ -1979,23 +2780,23 @@ if (!user || !user.username) {
               </div>
             </div>
           )}
-
-          {sparePopup && (
-            <SparePopup
-              onClose={() => setSparePopup(false)}
-              setSpareCharge={setSpareCharge}
-              setSpareItems={setSpareItems}
-              existingItems={spareItems}
-              referenceData={{ income, service: serviceCharge, others: othersAmount, advance: advanceAmount }}
-            />
-          )}
-
+{sparePopup && (
+  <SparePopup
+    onClose={() => setSparePopup(false)}
+    setSpareCharge={setSpareCharge}
+    setSpareItems={setSpareItems}
+    existingItems={spareItems}
+    referenceData={{ income, service: serviceCharge, others: othersAmount, advance: advanceAmount }}
+    spareBaselineAmount={spareBaselineRef.current}
+  />
+)}
           {showOthersPopup && (
             <OthersPopup
               onClose={() => setShowOthersPopup(false)}
               setOthersAmount={setOthersAmount}
               setOthersItems={setOthersItems}
               existingItems={othersItems}
+                  othersBaselineAmount={othersBaselineRef.current}   // ✅ NEW
               referenceData={{ income, service: serviceCharge, spare: spareCharge, advance: advanceAmount }}
             />
           )}
@@ -2006,6 +2807,7 @@ if (!user || !user.username) {
               setAdvanceAmount={setAdvanceAmount}
               setAdvanceItems={setAdvanceItems}
               existingItems={advanceItems}
+                advanceBaselineAmount={advanceBaselineRef.current}   // ✅ NEW
               referenceData={{ income, service: serviceCharge, spare: spareCharge, others: othersAmount }}
             />
           )}
@@ -2029,8 +2831,8 @@ if (!user || !user.username) {
           )}
 
           {isEdit && !localEditData?.isCancelled && (
-            <button style={{ ...sideBtnSave, width: "auto" }} onClick={handleUpdate}>
-              <Save size={16} /> {localEditData?.rebillPending ? "Save Rebill" : "Update"}
+            <button style={{ ...sideBtnSave, width: "auto" }} onClick={handleUpdate} disabled={updating}>
+              <Save size={16} /> {updating ? "Updating..." : (localEditData?.rebillPending ? "Save Rebill" : "Update")}
             </button>
           )}
 
@@ -2041,7 +2843,7 @@ if (!user || !user.username) {
           <button
             style={{ ...sideBtnEstimate, width: "auto" }}
             onClick={() => {
-              if (!editData?._id) { alert("Please save Job Sheet first"); return; }
+              if (!editData?._id) { showToast("Please save Job Sheet first", "warning"); return; }
               window.open(`${window.location.origin}/estimate-bill/${editData._id}`, "_blank");
             }}
           >
@@ -2051,21 +2853,34 @@ if (!user || !user.username) {
           <button
             style={{ ...sideBtnInvoice, width: "auto" }}
             onClick={async () => {
-              if (!localEditData?._id) { alert("Please save Job Sheet first"); return; }
+              if (!localEditData?._id) { showToast("Please save Job Sheet first", "warning"); return; }
               try {
                 window.open(`${window.location.origin}/invoice/${localEditData._id}`, "_blank");
                 await axios.put(`${API}/api/jobsheets/${localEditData._id}/invoice`);
                 setLocalEditData(prev => ({ ...prev, isInvoiced: true }));
-                alert("Invoice Generated Successfully 🔒");
+                showToast("Invoice Generated Successfully", "success");
                 setTimeout(() => { window.location.reload(); }, 1000);
               } catch (err) {
                 console.error(err);
-                alert("Invoice failed ❌");
+                showToast("Invoice failed", "error");
               }
             }}
           >
             <Receipt size={16} /> Invoice
           </button>
+
+          {/* ================= SEND WHATSAPP BUTTON (NEW) =================
+              Only shown once the job sheet is saved (needs an _id). Sends whatever
+              Device Status is currently saved in the DB to the customer's WhatsApp. */}
+          {/* {isEdit && localEditData?._id && (
+            <button
+              style={{ ...sideBtnWhatsApp, width: "auto" }}
+              onClick={handleSendWhatsApp}
+              disabled={sendingWhatsApp}
+            >
+              <MessageCircle size={16} /> {sendingWhatsApp ? "Sending..." : "Send WhatsApp"}
+            </button>
+          )} */}
 
           <button style={{ ...sideBtnHome, width: "auto" }} onClick={() => navigate("/home")}>
             <Home size={16} /> Home
@@ -2075,13 +2890,7 @@ if (!user || !user.username) {
             <Plus size={16} /> New
           </button>
 
-          {isEdit && localEditData && !localEditData?.isCancelled && (
-            <button style={{ ...sideBtnCancel, width: "auto" }} onClick={() => setShowCancelModal(true)}>
-              <Ban size={16} /> Cancel
-            </button>
-          )}
-
-          {isEdit && localEditData?.isInvoiced && (
+                 {isEdit && localEditData?.isInvoiced && (
             <button
               style={{ ...sideBtnRebill, width: "auto" }}
               disabled={rebilling}
@@ -2091,22 +2900,41 @@ if (!user || !user.username) {
                   `⚠️ Rebill Confirmation\n\nThis will:\n• Unlock the job sheet for editing\n• Clear current charges (Rebill #${rebillCount})\n• Set status back to "Received"\n• Save old invoice to rebill history\n\nProceed?`
                 );
                 if (!confirmed) return;
-                setRebilling(true);
+                              setRebilling(true);
                 try {
                   const user = JSON.parse(sessionStorage.getItem("user") || "{}");
                   const res = await axios.put(`${API}/api/jobsheets/${localEditData._id}/rebill`, {
                     rebilledBy: user?.username || "admin",
                   });
-                  setLocalEditData(res.data);
+                                                       setLocalEditData(res.data);
                   setMobileStatus("Received");
                   setServiceCharge("");
-                  setSpareCharge("");
-                  setSpareItems([]);
+                  setSpareItems(res.data.spareItems || []);
+                  spareBaselineRef.current = (res.data.spareItems || [])
+                    .reduce((s, it) => s + Number(it.amount || 0), 0);
+                    
+                    advanceBaselineRef.current = Number(res.data.service?.advanceBaseline || 0);  
+
+                  // ✅ FIX — compute baseline directly from the items array (like Spare does),
+                  // instead of trusting the stored "othersBaseline" number from the server.
+                  const othersItemsFromServer = res.data.service?.othersItems || [];
+                  othersBaselineRef.current = othersItemsFromServer
+                    .reduce((s, it) => s + Number(it.amount || 0), 0);
+
                   setRemarks("");
-                  alert(`✅ Rebill #${rebillCount} opened! Add new charges and generate invoice.`);
+                  setIncome("");
+                  setIncomeDate("");
+                  setIncomeDateTouched(false);
+                  // ✅ FIX — must equal the baseline, NOT "". Others has no auto-sync
+                  // useEffect like Spare's spareCharge, so leaving this "" would wipe
+                  // DB's othersAmount to 0 on the very next Update.
+                  setOthersAmount(String(othersBaselineRef.current));
+                  setOthersItems(othersItemsFromServer);
+                  showToast(`Rebill #${rebillCount} opened! Add new charges and generate invoice.`, "success");
+                  fetchJobStats();
                 } catch (err) {
                   console.error(err);
-                  alert("Rebill failed ❌");
+                  showToast("Rebill failed", "error");
                 } finally {
                   setRebilling(false);
                 }

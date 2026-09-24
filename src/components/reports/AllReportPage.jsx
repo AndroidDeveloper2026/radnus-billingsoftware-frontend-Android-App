@@ -1,28 +1,41 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import axios from "axios";
 import * as XLSX from "xlsx";
 import { useNavigate } from "react-router-dom";
 import {
   FileText, Search, RotateCcw, Download, Printer,
   Instagram, Star, CheckCircle2, ThumbsUp, XCircle,
-  Inbox, StickyNote, Loader2, IndianRupee,
+  Inbox, StickyNote, Loader2, IndianRupee, Skull,
 } from "lucide-react";
 
 const AllReportPage = () => {
-    const navigate = useNavigate(); 
-  const [filteredData, setFilteredData] = useState([]);
-  const [loading, setLoading] = useState(false);
-
-  const [search, setSearch]     = useState("");
-  const [status, setStatus]     = useState("");
-  const [engineer, setEngineer] = useState("");
-  const [dealer, setDealer]     = useState("");
-  const [fromDate, setFromDate] = useState("");
-  const [toDate, setToDate]     = useState("");
-
-  const [engineerList, setEngineerList] = useState([]);
+  const navigate = useNavigate();
 
   const API = import.meta.env.VITE_API_URL;
+
+  /* ================= RAW DATA (fetched once, filtered client-side) =================
+     🔁 CHANGED — like SpareReportPage, we now pull the FULL job sheet list once and
+     do every filter (search/status/engineer/serviceRep/dealer/date) in the browser.
+     This is what lets "Transaction Date" filtering work — transaction dates live
+     inside revenueEntries[]/spareItems[]/advanceDate, which the old server-side
+     ?fromDate&toDate filter (on createdAt only) couldn't see. */
+  const [rawData, setRawData] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [engineerList, setEngineerList] = useState([]);
+
+  const emptyFilters = () => ({
+    search: "",
+    status: "",
+    engineer: "",
+    serviceRep: "",   // NEW
+    dealer: "",
+    dateType: "created", // NEW — "created" | "transaction"
+    fromDate: "",
+    toDate: "",
+  });
+
+  const [filters, setFilters] = useState(emptyFilters());
+  const [applied, setApplied] = useState(emptyFilters());
 
   useEffect(() => {
     axios.get(`${API}/api/engineers`)
@@ -30,19 +43,11 @@ const AllReportPage = () => {
       .catch(err => console.error(err));
   }, []);
 
-  const fetchData = async () => {
+  const loadData = async () => {
     setLoading(true);
     try {
-      const params = {};
-      if (search)   params.q        = search.trim();
-      if (status)   params.status   = status;
-      if (engineer) params.engineer = engineer;
-      if (dealer)   params.dealer   = dealer.trim();
-      if (fromDate) params.fromDate = fromDate;
-      if (toDate)   params.toDate   = toDate;
-
-      const res = await axios.get(`${API}/api/jobsheets/filter`, { params });
-      setFilteredData(res.data);
+      const res = await axios.get(`${API}/api/jobsheets/filter`, { params: {} });
+      setRawData(res.data || []);
     } catch (err) {
       console.error(err);
       alert("Failed to fetch data ❌");
@@ -51,19 +56,195 @@ const AllReportPage = () => {
     }
   };
 
-  useEffect(() => { fetchData(); }, []);
+  useEffect(() => { loadData(); }, []);
+
+  const handleApply = () => setApplied(filters);
 
   const handleReset = () => {
-    setSearch(""); setStatus(""); setEngineer("");
-    setDealer(""); setFromDate(""); setToDate("");
-    setTimeout(() => {
-      axios.get(`${API}/api/jobsheets/filter`)
-        .then(res => setFilteredData(res.data))
-        .catch(err => console.error(err));
-    }, 100);
+    const reset = emptyFilters();
+    setFilters(reset);
+    setApplied(reset);
   };
 
   const handlePrint = () => window.print();
+
+  /* ================= SERVICE REP DROPDOWN OPTIONS (NEW) =================
+     Auto-derived from whatever's actually in the data — every rep name
+     (Shanthi, Kalai, Gomathi, etc.) shows up here without needing a
+     separate API endpoint or manual list to maintain. */
+  const serviceRepList = useMemo(() => {
+    const set = new Set();
+    rawData.forEach(item => {
+      if (item.service?.serviceRep) set.add(item.service.serviceRep);
+    });
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }, [rawData]);
+
+  /* ================= DATE HELPERS (NEW) ================= */
+  const toYMD = (val) => (val ? new Date(val).toLocaleDateString("en-CA") : "");
+
+  /* Every date a job sheet actually had money move on: each rebill's
+     income entry, each spare part's date, plus the advance date.
+     Falls back to incomeDate when there are no revenueEntries yet
+     (job never rebilled). */
+  const getTransactionDates = (item) => {
+    const dates = [];
+    const revenueEntries = item.service?.revenueEntries || [];
+    revenueEntries.forEach(e => { if (e.date) dates.push(toYMD(e.date)); });
+    if (revenueEntries.length === 0 && item.service?.incomeDate) {
+      dates.push(toYMD(item.service.incomeDate));
+    }
+    (item.spareItems || []).forEach(si => { if (si.date) dates.push(toYMD(si.date)); });
+    if (item.service?.advanceDate) dates.push(toYMD(item.service.advanceDate));
+    return dates;
+  };
+
+  const dateMatches = (item) => {
+    if (!applied.fromDate && !applied.toDate) return true;
+
+    if (applied.dateType === "transaction") {
+      const dates = getTransactionDates(item);
+      if (dates.length === 0) return false;
+      return dates.some(d =>
+        (!applied.fromDate || d >= applied.fromDate) &&
+        (!applied.toDate || d <= applied.toDate)
+      );
+    }
+
+    // default: created date
+    const d = toYMD(item.createdAt);
+    if (applied.fromDate && d < applied.fromDate) return false;
+    if (applied.toDate && d > applied.toDate) return false;
+    return true;
+  };
+
+  /* ================= MAIN FILTERED LIST (NEW — client-side) ================= */
+  const filteredData = useMemo(() => {
+    const q = applied.search.trim().toLowerCase();
+    const dealerQ = applied.dealer.trim().toLowerCase();
+
+    return rawData.filter(item => {
+      if (q) {
+        const hay = `${item.jobSheetNo || ""} ${item.customer?.name || ""} ${item.customer?.contact || ""} ${item.device?.imei || ""}`.toLowerCase();
+        if (!hay.includes(q)) return false;
+      }
+      if (applied.status && item.device?.mobileStatus !== applied.status) return false;
+      if (applied.engineer && item.service?.engineer !== applied.engineer) return false;
+      if (applied.serviceRep && item.service?.serviceRep !== applied.serviceRep) return false;
+      if (dealerQ && !(item.service?.dealer || "").toLowerCase().includes(dealerQ)) return false;
+      if (!dateMatches(item)) return false;
+      return true;
+    });
+  }, [rawData, applied]);
+
+  /* ================= IMEI DISPLAY HELPER =================
+     device.imei is saved as the literal string "DEAD" when the Job Sheet's
+     "Dead Phone (No IMEI available)" checkbox was ticked (see JobSheetPage).
+     This report only ever showed the raw string before, so a normal number
+     and "DEAD" looked the same in a plain cell. Now: a real IMEI shows as
+     before, and "DEAD" shows as a small red skull badge so it's obvious at
+     a glance which job sheets have no IMEI on file. Used for both the table
+     cell and the Excel export label.
+  */
+  const imeiDisplayValue = (imei) => (imei === "DEAD" ? "DEAD (No IMEI)" : (imei || "-"));
+
+  const ImeiCell = ({ imei }) => {
+    if (imei === "DEAD") {
+      return (
+        <span style={{
+          display: "inline-flex", alignItems: "center", gap: 4,
+          background: "#fee2e2", color: "#991b1b",
+          padding: "2px 7px", borderRadius: 10,
+          fontSize: 11, fontWeight: 700, whiteSpace: "nowrap",
+        }}>
+          <Skull size={11} /> DEAD
+        </span>
+      );
+    }
+    return <span>{imei || "-"}</span>;
+  };
+
+  /* ================= LIFETIME INCOME / SERVICE TOTAL =================
+     🔴 BUG FIX — Once a job sheet has been rebilled at least once,
+     `service.income` / `service.serviceCharge` (top-level fields) only reflect
+     the CURRENT cycle (post-rebill), because the rebill route resets them to 0
+     and the user re-enters fresh charges. The OLD cycle's amount is preserved
+     only inside `service.revenueEntries[]` (one entry per cycle/date).
+
+     `service.spareCharge` does NOT have this problem — spareItems is cumulative
+     across every rebill, so spareCharge always already equals the full lifetime
+     total (see jobSheetController.js's rebill route comments).
+
+     This mirrors the exact same logic ValueReport.jsx's buildRows() already
+     uses: if revenueEntries has data, sum it (= true lifetime total); otherwise
+     (job never rebilled) fall back to the plain top-level field. */
+  const getIncomeTotal = (item) => {
+    const entries = item.service?.revenueEntries || [];
+    return entries.length > 0
+      ? entries.reduce((s, e) => s + Number(e.income || 0), 0)
+      : Number(item.service?.income || 0);
+  };
+
+  const getServiceTotal = (item) => {
+    const entries = item.service?.revenueEntries || [];
+    return entries.length > 0
+      ? entries.reduce((s, e) => s + Number(e.service || 0), 0)
+      : Number(item.service?.serviceCharge || 0);
+  };
+
+  /* ================= PER-DATE BREAKDOWN HELPERS =================
+     Returns [{ label: "01 Aug", amount: 1000 }, ...] for a given field, only
+     when there's genuinely more than one date to show (single-cycle jobs
+     return an empty array so the pill list stays hidden — no visual noise). */
+  const getBreakdown = (entries, field) => {
+    const list = (entries || [])
+      .filter(e => Number(e[field] || 0) > 0)
+      .map(e => ({
+        label: new Date(e.date).toLocaleDateString("en-IN", { day: "2-digit", month: "short" }),
+        amount: Number(e[field]),
+      }));
+    return list.length > 1 ? list : [];
+  };
+
+  const getIncomeBreakdown  = (item) => getBreakdown(item.service?.revenueEntries, "income");
+  const getServiceBreakdown = (item) => getBreakdown(item.service?.revenueEntries, "service");
+  // spareItems isn't a "revenueEntries" ledger — it's the raw spare parts list,
+  // each with its own date/amount — so it needs its own small mapper.
+  const getSpareBreakdown = (item) => {
+    const list = (item.spareItems || [])
+      .filter(si => Number(si.amount || 0) > 0)
+      .map(si => ({
+        label: new Date(si.date).toLocaleDateString("en-IN", { day: "2-digit", month: "short" }),
+        amount: Number(si.amount),
+        name: si.name,
+      }));
+    return list.length > 1 ? list : [];
+  };
+
+  /* ================= BREAKDOWN PILL LIST =================
+     Small, compact "date → amount" chips shown under a total when a job has
+     more than one transaction date (e.g. after a rebill). Kept visually light
+     (dashed divider, muted grey, small font) so it doesn't compete with the
+     main bold total above it. */
+  const BreakdownPills = ({ items, color }) => {
+    if (!items || items.length === 0) return null;
+    return (
+      <div style={{
+        marginTop: 5, paddingTop: 4, borderTop: "1px dashed #e2e8f0",
+        display: "flex", flexDirection: "column", gap: 2,
+      }}>
+        {items.map((it, i) => (
+          <div key={i} style={{
+            display: "flex", alignItems: "center", justifyContent: "space-between",
+            gap: 10, fontSize: 10.5, lineHeight: 1.4,
+          }}>
+            <span style={{ color: "#94a3b8", fontWeight: 500 }}>{it.label}</span>
+            <span style={{ color, fontWeight: 700 }}>₹{it.amount.toLocaleString("en-IN")}</span>
+          </div>
+        ))}
+      </div>
+    );
+  };
 
   const handleExcelDownload = () => {
     if (filteredData.length === 0) { alert("No data to export ❌"); return; }
@@ -76,16 +257,25 @@ const AllReportPage = () => {
       "Contact":            item.customer?.contact || "-",
       "Alt Contact":        item.customer?.altContact || "-",
       "Email":              item.customer?.email || "-",
-      "Address":            item.customer?.address || "-",
+      "District":           item.customer?.district || "-",
+      "Taluk":              item.customer?.taluk || "-",
       "Make":               item.device?.make || "-",
       "Model":              item.device?.model || "-",
-      "IMEI":               item.device?.imei || "-",
+      "IMEI":               imeiDisplayValue(item.device?.imei),
       "Warranty":           item.device?.warranty || "-",
       "Status":             item.device?.mobileStatus || "-",
       "Engineer":           item.service?.engineer || "-",
+      "Service Rep":        item.service?.serviceRep || "-",
       "Dealer":             item.service?.dealer || "-",
       "Drawer":             item.service?.drawer || "-",
-      "Total":              (Number(item.service?.income || 0) + Number(item.service?.spareCharge || 0)),
+      "Income ₹":           getIncomeTotal(item),
+      "Income Date":        item.service?.incomeDate ? new Date(item.service.incomeDate).toLocaleDateString("en-IN") : "-",
+      "Service ₹":          getServiceTotal(item),
+      "Spare ₹":            Number(item.service?.spareCharge || 0),
+      "Others ₹":           Number(item.service?.othersAmount || 0),
+      "Advance ₹":          Number(item.service?.advanceAmount || 0),
+      "Advance Date":       item.service?.advanceDate ? new Date(item.service.advanceDate).toLocaleDateString("en-IN") : "-",
+      "Total":              (getIncomeTotal(item) + Number(item.service?.spareCharge || 0)),
       "Payment Mode":       item.service?.paymentMode || "-",
       "Estimate":           item.service?.estimate || "-",
       "Repair Date":        item.service?.repairDate ? new Date(item.service.repairDate).toLocaleDateString("en-IN") : "-",
@@ -100,35 +290,36 @@ const AllReportPage = () => {
       "Cancel Remarks":     item.cancelRemarks || "-",
       "Cancelled By":       item.cancelledBy   || "-",
       "Created By":         item.createdBy?.name || item.createdBy?.username || "-",
-      "Service Rep":        item.service?.serviceRep || "-",
     }));
 
     const ws = XLSX.utils.json_to_sheet(rows);
     ws["!cols"] = [
       { wch: 6 },  { wch: 12 }, { wch: 12 }, { wch: 18 }, { wch: 13 },
-      { wch: 13 }, { wch: 22 }, { wch: 22 }, { wch: 14 }, { wch: 16 },
+      { wch: 13 }, { wch: 22 }, { wch: 22 }, { wch: 16 }, { wch: 16 },
+      { wch: 14 }, { wch: 16 },
       { wch: 17 }, { wch: 12 }, { wch: 16 }, { wch: 14 }, { wch: 16 },
-      { wch: 12 }, { wch: 10 }, { wch: 13 },
+      { wch: 12 },
+      { wch: 12 }, { wch: 14 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 14 },
+      { wch: 10 }, { wch: 13 },
       { wch: 14 }, { wch: 13 }, { wch: 14 }, { wch: 28 }, { wch: 28 },
       { wch: 22 }, { wch: 13 }, { wch: 12 }, { wch: 14 },
-      { wch: 14 }, { wch: 14 }, 
+      { wch: 14 }, { wch: 14 },
     ];
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "All Reports");
-    XLSX.writeFile(wb, `All_Report_${fromDate || "all"}_to_${toDate || "all"}.xlsx`);
+    XLSX.writeFile(wb, `All_Report_${applied.fromDate || "all"}_to_${applied.toDate || "all"}.xlsx`);
   };
 
- const getStatusStyle = (s) => {
-  if (s === "Delivered")       return { background: "#d1fae5", color: "#065f46", padding: "2px 8px", borderRadius: "12px", fontSize: "11px", fontWeight: 600, whiteSpace: "nowrap" };
-  if (s === "Pending")         return { background: "#fef3c7", color: "#92400e", padding: "2px 8px", borderRadius: "12px", fontSize: "11px", fontWeight: 600, whiteSpace: "nowrap" };
-  if (s === "Received")        return { background: "#dbeafe", color: "#1e40af", padding: "2px 8px", borderRadius: "12px", fontSize: "11px", fontWeight: 600, whiteSpace: "nowrap" };
-  if (s === "Repaired")        return { background: "#e0e7ff", color: "#3730a3", padding: "2px 8px", borderRadius: "12px", fontSize: "11px", fontWeight: 600, whiteSpace: "nowrap" }; // 👈 new
-  if (s === "Delivered NR/NA") return { background: "#fee2e2", color: "#991b1b", padding: "2px 8px", borderRadius: "12px", fontSize: "11px", fontWeight: 600, whiteSpace: "nowrap" };
-  if (s === "Cancelled")       return { background: "#fee2e2", color: "#991b1b", padding: "2px 8px", borderRadius: "12px", fontSize: "11px", fontWeight: 600, whiteSpace: "nowrap" };
-  return { background: "#f3f4f6", color: "#374151", padding: "2px 8px", borderRadius: "12px", fontSize: "11px", fontWeight: 600 };
-};
+  const getStatusStyle = (s) => {
+    if (s === "Delivered")       return { background: "#d1fae5", color: "#065f46", padding: "2px 8px", borderRadius: "12px", fontSize: "11px", fontWeight: 600, whiteSpace: "nowrap" };
+    if (s === "Pending")         return { background: "#fef3c7", color: "#92400e", padding: "2px 8px", borderRadius: "12px", fontSize: "11px", fontWeight: 600, whiteSpace: "nowrap" };
+    if (s === "Received")        return { background: "#dbeafe", color: "#1e40af", padding: "2px 8px", borderRadius: "12px", fontSize: "11px", fontWeight: 600, whiteSpace: "nowrap" };
+    if (s === "Repaired")        return { background: "#e0e7ff", color: "#3730a3", padding: "2px 8px", borderRadius: "12px", fontSize: "11px", fontWeight: 600, whiteSpace: "nowrap" };
+    if (s === "Delivered NR/NA") return { background: "#fee2e2", color: "#991b1b", padding: "2px 8px", borderRadius: "12px", fontSize: "11px", fontWeight: 600, whiteSpace: "nowrap" };
+    if (s === "Cancelled")       return { background: "#fee2e2", color: "#991b1b", padding: "2px 8px", borderRadius: "12px", fontSize: "11px", fontWeight: 600, whiteSpace: "nowrap" };
+    return { background: "#f3f4f6", color: "#374151", padding: "2px 8px", borderRadius: "12px", fontSize: "11px", fontWeight: 600 };
+  };
 
-  // ✅ Insta / Google badge helper
   const socialBadge = (val) => {
     if (!val || val === "-") return <span style={{ color: "#94a3b8" }}>—</span>;
     if (val === "Already Done")
@@ -140,21 +331,25 @@ const AllReportPage = () => {
     return <span style={{ fontSize: 11 }}>{val}</span>;
   };
 
-const totalService = filteredData.reduce((s, i) => s + Number(i.service?.income || 0), 0);
-const totalSpare   = filteredData.reduce((s, i) => s + Number(i.service?.spareCharge || 0), 0);
-const totalAmount  = totalService + totalSpare;
+  const totalService = filteredData.reduce((s, i) => s + getIncomeTotal(i), 0);
+  const totalSpare   = filteredData.reduce((s, i) => s + Number(i.service?.spareCharge || 0), 0);
+  const totalAmount  = totalService + totalSpare;
 
   const headers = [
     "SL", "Date", "Job No", "Name", "Contact", "Alt Contact",
+    "District", "Taluk",
     "Make", "Model", "IMEI", "Warranty", "Status",
-    "Engineer", "Dealer", "Drawer",
+    "Engineer", "Service Rep", "Dealer", "Drawer",
+    "Income ₹", "Income Date", "Service ₹", "Spare ₹", "Others ₹", "Advance ₹", "Advance Date",
     "Total ₹", "Payment",
     "Problems", "Physical Cond.", "Accessories",
     "Repair Date", "Delivery Date", "Margin ₹", "Remarks",
     "Insta", "Google",
-    "Service Rep", 
-    "Created By"
+    "Created By",
   ];
+
+  const labelStyle = { fontSize: "11px", color: "#64748b", fontWeight: 600 };
+  const inputStyle = { border: "1px solid #cbd5e1", borderRadius: "8px", padding: "7px 10px", fontSize: "13px" };
 
   return (
     <div style={{ minHeight: "100vh", background: "#f1f5f9", padding: "20px" }}>
@@ -172,57 +367,79 @@ const totalAmount  = totalService + totalSpare;
         <div style={{ display: "flex", flexWrap: "wrap", gap: "10px", alignItems: "flex-end" }}>
 
           <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
-            <label style={{ fontSize: "11px", color: "#64748b", fontWeight: 600 }}>Search</label>
-            <input type="text" placeholder="Name / Contact / Job No / IMEI" value={search}
-              onChange={e => setSearch(e.target.value)} onKeyDown={e => e.key === "Enter" && fetchData()}
-              style={{ border: "1px solid #cbd5e1", borderRadius: "8px", padding: "7px 10px", fontSize: "13px", width: "220px" }} />
+            <label style={labelStyle}>Search</label>
+            <input type="text" placeholder="Name / Contact / Job No / IMEI" value={filters.search}
+              onChange={e => setFilters({ ...filters, search: e.target.value })}
+              onKeyDown={e => e.key === "Enter" && handleApply()}
+              style={{ ...inputStyle, width: "220px" }} />
           </div>
 
           <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
-            <label style={{ fontSize: "11px", color: "#64748b", fontWeight: 600 }}>Status</label>
-            <select value={status} onChange={e => setStatus(e.target.value)}
-              style={{ border: "1px solid #cbd5e1", borderRadius: "8px", padding: "7px 10px", fontSize: "13px", width: "150px" }}>
-            <option value="">All Status</option>
-<option value="Received">Received</option>
-<option value="Pending">Pending</option>
-<option value="Repaired">Repaired</option>   {/* 👈 new */}
-<option value="Delivered">Delivered</option>
-<option value="Delivered NR/NA">Delivered NR/NA</option>
-<option value="Cancelled">Cancelled</option>
+            <label style={labelStyle}>Status</label>
+            <select value={filters.status} onChange={e => setFilters({ ...filters, status: e.target.value })}
+              style={{ ...inputStyle, width: "150px" }}>
+              <option value="">All Status</option>
+              <option value="Received">Received</option>
+              <option value="Pending">Pending</option>
+              <option value="Repaired">Repaired</option>
+              <option value="Delivered">Delivered</option>
+              <option value="Delivered NR/NA">Delivered NR/NA</option>
+              <option value="Cancelled">Cancelled</option>
             </select>
           </div>
 
           <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
-            <label style={{ fontSize: "11px", color: "#64748b", fontWeight: 600 }}>Engineer</label>
-            <select value={engineer} onChange={e => setEngineer(e.target.value)}
-              style={{ border: "1px solid #cbd5e1", borderRadius: "8px", padding: "7px 10px", fontSize: "13px", width: "140px" }}>
+            <label style={labelStyle}>Engineer</label>
+            <select value={filters.engineer} onChange={e => setFilters({ ...filters, engineer: e.target.value })}
+              style={{ ...inputStyle, width: "140px" }}>
               <option value="">All Engineers</option>
               {engineerList.map((eng, i) => <option key={i} value={eng.name || eng}>{eng.name || eng}</option>)}
             </select>
           </div>
 
+          {/* ===== NEW: Service Rep filter, options auto-pulled from data ===== */}
           <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
-            <label style={{ fontSize: "11px", color: "#64748b", fontWeight: 600 }}>Dealer</label>
-            <input type="text" placeholder="Dealer name" value={dealer} onChange={e => setDealer(e.target.value)}
-              style={{ border: "1px solid #cbd5e1", borderRadius: "8px", padding: "7px 10px", fontSize: "13px", width: "130px" }} />
+            <label style={labelStyle}>Service Rep</label>
+            <select value={filters.serviceRep} onChange={e => setFilters({ ...filters, serviceRep: e.target.value })}
+              style={{ ...inputStyle, width: "150px" }}>
+              <option value="">All Reps</option>
+              {serviceRepList.map((rep, i) => <option key={i} value={rep}>{rep}</option>)}
+            </select>
           </div>
 
           <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
-            <label style={{ fontSize: "11px", color: "#64748b", fontWeight: 600 }}>From Date</label>
-            <input type="date" value={fromDate} onChange={e => setFromDate(e.target.value)}
-              style={{ border: "1px solid #cbd5e1", borderRadius: "8px", padding: "7px 10px", fontSize: "13px" }} />
+            <label style={labelStyle}>Dealer</label>
+            <input type="text" placeholder="Dealer name" value={filters.dealer}
+              onChange={e => setFilters({ ...filters, dealer: e.target.value })}
+              onKeyDown={e => e.key === "Enter" && handleApply()}
+              style={{ ...inputStyle, width: "130px" }} />
+          </div>
+
+          {/* ===== NEW: Created vs Transaction date toggle ===== */}
+          <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+            <label style={labelStyle}>Filter By</label>
+            <select value={filters.dateType} onChange={e => setFilters({ ...filters, dateType: e.target.value })}
+              style={{ ...inputStyle, width: "150px" }}>
+              <option value="created">Created Date</option>
+              <option value="transaction">Transaction Date</option>
+            </select>
           </div>
 
           <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
-            <label style={{ fontSize: "11px", color: "#64748b", fontWeight: 600 }}>To Date</label>
-            <input type="date" value={toDate} onChange={e => setToDate(e.target.value)}
-              style={{ border: "1px solid #cbd5e1", borderRadius: "8px", padding: "7px 10px", fontSize: "13px" }} />
+            <label style={labelStyle}>From Date</label>
+            <input type="date" value={filters.fromDate} onChange={e => setFilters({ ...filters, fromDate: e.target.value })}
+              style={inputStyle} />
           </div>
 
-          <button onClick={fetchData} disabled={loading}
+          <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+            <label style={labelStyle}>To Date</label>
+            <input type="date" value={filters.toDate} onChange={e => setFilters({ ...filters, toDate: e.target.value })}
+              style={inputStyle} />
+          </div>
+
+          <button onClick={handleApply}
             style={{ background: "#2563eb", color: "#fff", border: "none", borderRadius: "8px", padding: "8px 18px", fontWeight: 600, fontSize: "13px", cursor: "pointer", display: "flex", alignItems: "center", gap: "6px" }}>
-            {loading ? <Loader2 size={14} className="animate-spin" /> : <Search size={14} />}
-            {loading ? "Loading..." : "Apply Filter"}
+            <Search size={14} /> Apply Filter
           </button>
           <button onClick={handleReset}
             style={{ background: "#64748b", color: "#fff", border: "none", borderRadius: "8px", padding: "8px 14px", fontWeight: 600, fontSize: "13px", cursor: "pointer", display: "flex", alignItems: "center", gap: "6px" }}>
@@ -243,7 +460,6 @@ const totalAmount  = totalService + totalSpare;
       <div style={{ display: "flex", gap: "12px", marginBottom: "14px", flexWrap: "wrap" }}>
         {[
           { label: "Total Records", icon: <FileText size={12} />, value: filteredData.length, color: "#2563eb" },
-        
           { label: "Instagram",     icon: <Instagram size={12} />, value: filteredData.filter(i => i.service?.instaFollowers === "Yes").length, color: "#e11d48" },
           { label: "Google Review", icon: <Star size={12} />, value: filteredData.filter(i => i.service?.googleReview === "Yes").length, color: "#d97706" },
         ].map((s, i) => (
@@ -253,14 +469,14 @@ const totalAmount  = totalService + totalSpare;
           </div>
         ))}
         <div style={{ background: "#fff", borderRadius: "10px", padding: "10px 18px", boxShadow: "0 1px 4px rgba(0,0,0,0.07)", fontSize: "12px", color: "#64748b", display: "flex", flexDirection: "column", justifyContent: "center" }}>
-          <div><b>From:</b> {fromDate || "-"}</div>
-          <div><b>To:</b>   {toDate   || "-"}</div>
+          <div><b>Filter By:</b> {applied.dateType === "transaction" ? "Transaction Date" : "Created Date"}</div>
+          <div><b>From:</b> {applied.fromDate || "-"} &nbsp; <b>To:</b> {applied.toDate || "-"}</div>
         </div>
       </div>
 
       {/* TABLE */}
       <div style={{ background: "#fff", borderRadius: "12px", boxShadow: "0 1px 6px rgba(0,0,0,0.08)", border: "1px solid #e2e8f0", overflow: "hidden" }}>
-        <div style={{ overflowX: "auto", maxHeight: "62vh", overflowY: "auto" }}>
+        <div className="report-scroll" style={{ overflowX: "auto", maxHeight: "62vh", overflowY: "auto" }}>
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "12px" }}>
 
             <thead style={{ position: "sticky", top: 0, zIndex: 10 }}>
@@ -278,8 +494,8 @@ const totalAmount  = totalService + totalSpare;
                 </td></tr>
               ) : filteredData.length > 0 ? (
                 filteredData.map((item, index) => {
-              const svc   = Number(item.service?.income || 0);
-const spare = Number(item.service?.spareCharge   || 0);
+                  const svc   = getIncomeTotal(item);
+                  const spare = Number(item.service?.spareCharge || 0);
                   const rowBg = index % 2 === 0 ? "#fff" : "#f8fafc";
                   const td    = { padding: "8px 8px", borderBottom: "1px solid #e2e8f0", borderRight: "1px solid #e2e8f0", whiteSpace: "nowrap", color: "#1e293b" };
                   return (
@@ -297,9 +513,11 @@ const spare = Number(item.service?.spareCharge   || 0);
                       <td style={{ ...td, fontWeight: 600 }}>{item.customer?.name || "-"}</td>
                       <td style={td}>{item.customer?.contact || "-"}</td>
                       <td style={td}>{item.customer?.altContact || "-"}</td>
+                      <td style={td}>{item.customer?.district || "-"}</td>
+                      <td style={td}>{item.customer?.taluk || "-"}</td>
                       <td style={td}>{item.device?.make || "-"}</td>
                       <td style={td}>{item.device?.model || "-"}</td>
-                      <td style={td}>{item.device?.imei || "-"}</td>
+                      <td style={td}><ImeiCell imei={item.device?.imei} /></td>
                       <td style={td}>{item.device?.warranty || "-"}</td>
                       <td style={td}>
                         <span style={getStatusStyle(item.device?.mobileStatus)}>
@@ -312,8 +530,35 @@ const spare = Number(item.service?.spareCharge   || 0);
                         )}
                       </td>
                       <td style={td}>{item.service?.engineer || "-"}</td>
+                      <td style={td}>{item.service?.serviceRep || "-"}</td>
                       <td style={td}>{item.service?.dealer || "-"}</td>
                       <td style={td}>{item.service?.drawer || "-"}</td>
+
+                      <td style={{ ...td, color: "#0369a1", fontWeight: 600, whiteSpace: "normal", verticalAlign: "top" }}>
+                        {svc ? `₹${svc.toLocaleString("en-IN")}` : "-"}
+                        <BreakdownPills items={getIncomeBreakdown(item)} color="#0369a1" />
+                      </td>
+                      <td style={td}>
+                        {item.service?.incomeDate ? new Date(item.service.incomeDate).toLocaleDateString("en-IN") : "-"}
+                      </td>
+                      <td style={{ ...td, whiteSpace: "normal", verticalAlign: "top" }}>
+                        {getServiceTotal(item) ? `₹${getServiceTotal(item).toLocaleString("en-IN")}` : "-"}
+                        <BreakdownPills items={getServiceBreakdown(item)} color="#1e293b" />
+                      </td>
+                      <td style={{ ...td, whiteSpace: "normal", verticalAlign: "top" }}>
+                        {spare ? `₹${spare.toLocaleString("en-IN")}` : "-"}
+                        <BreakdownPills items={getSpareBreakdown(item)} color="#7e22ce" />
+                      </td>
+                      <td style={td}>
+                        {item.service?.othersAmount ? `₹${Number(item.service.othersAmount).toLocaleString("en-IN")}` : "-"}
+                      </td>
+                      <td style={{ ...td, color: "#0d6efd", fontWeight: 600 }}>
+                        {item.service?.advanceAmount ? `₹${Number(item.service.advanceAmount).toLocaleString("en-IN")}` : "-"}
+                      </td>
+                      <td style={td}>
+                        {item.service?.advanceDate ? new Date(item.service.advanceDate).toLocaleDateString("en-IN") : "-"}
+                      </td>
+
                       <td style={{ ...td, color: "#059669", fontWeight: 700 }}>₹{(svc + spare).toLocaleString("en-IN")}</td>
                       <td style={td}>{item.service?.paymentMode || "-"}</td>
                       <td style={{ ...td, maxWidth: "160px", whiteSpace: "normal", wordBreak: "break-word" }}>{item.visualIssues?.filter(Boolean).join(", ") || "-"}</td>
@@ -327,11 +572,7 @@ const spare = Number(item.service?.spareCharge   || 0);
                       <td style={{ ...td, maxWidth: "140px", whiteSpace: "normal", wordBreak: "break-word" }}>{item.service?.remarks || "-"}</td>
                       <td style={{ ...td, textAlign: "center" }}>{socialBadge(item.service?.instaFollowers)}</td>
                       <td style={{ ...td, textAlign: "center" }}>{socialBadge(item.service?.googleReview)}</td>
-
-                       <td style={td}>{item.service?.serviceRep || "-"}</td>
                       <td style={td}>{item.createdBy?.name || item.createdBy?.username || "-"}</td>
-                     
-
                     </tr>
                   );
                 })
@@ -342,15 +583,14 @@ const spare = Number(item.service?.spareCharge   || 0);
               )}
             </tbody>
 
-            {/* FOOTER — colSpan 14 covers cols 0-13, then Total ₹ at 14, then colSpan 12 for the rest */}
             {filteredData.length > 0 && (
               <tfoot>
                 <tr style={{ background: "#1e293b", color: "#fff", fontWeight: 700 }}>
-                  <td colSpan="14" style={{ padding: "10px 8px", textAlign: "right", fontSize: "12px" }}>
+                  <td colSpan="23" style={{ padding: "10px 8px", textAlign: "right", fontSize: "12px" }}>
                     TOTAL ({filteredData.length} records):
                   </td>
                   <td style={{ padding: "10px 8px", color: "#6ee7b7" }}>₹{totalAmount.toLocaleString("en-IN")}</td>
-                  <td colSpan="12"></td>
+                  <td colSpan="11"></td>
                 </tr>
               </tfoot>
             )}
@@ -365,6 +605,27 @@ const spare = Number(item.service?.spareCharge   || 0);
           body { background: white; font-size: 11px; }
           table { font-size: 10px; }
           th, td { padding: 4px 5px !important; }
+        }
+
+        .report-scroll::-webkit-scrollbar {
+          height: 12px;
+          width: 12px;
+        }
+        .report-scroll::-webkit-scrollbar-track {
+          background: #e2e8f0;
+          border-radius: 8px;
+        }
+        .report-scroll::-webkit-scrollbar-thumb {
+          background: #2563eb;
+          border-radius: 8px;
+          border: 2px solid #e2e8f0;
+        }
+        .report-scroll::-webkit-scrollbar-thumb:hover {
+          background: #1d4ed8;
+        }
+        .report-scroll {
+          scrollbar-width: thin;
+          scrollbar-color: #2563eb #e2e8f0;
         }
       `}</style>
     </div>
