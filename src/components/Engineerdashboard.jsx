@@ -6,7 +6,7 @@ import {
   Trash2, Plus, ArrowLeftRight, Phone, Smartphone, AlertCircle,
   FileText, Calendar, CheckCircle2, ClipboardList, MessageSquare,
   Inbox, Undo2, Rocket, Loader2, User, Menu, BarChart3, PackageCheck,
-  X, Clock, ArrowUpDown, LayoutList
+  X, Clock, ArrowUpDown, LayoutList, RotateCcw
 } from "lucide-react";
 
 const STATUS_STEPS = [
@@ -16,6 +16,12 @@ const STATUS_STEPS = [
   { key: "Ready",      label: "Ready",      icon: CheckCircle2, color: "#10b981", bg: "#d1fae5" },
   { key: "Return",     label: "Return",     icon: Undo2,        color: "#ef4444", bg: "#fee2e2" },
   { key: "Delivered",  label: "Delivered",  icon: Rocket,       color: "#059669", bg: "#a7f3d0" },
+];
+
+// Report graph-ku status list (Cancelled-um serthu)
+const REPORT_STATUSES = [
+  ...STATUS_STEPS,
+  { key: "Cancelled", label: "Cancelled", icon: X, color: "#64748b", bg: "#e2e8f0" },
 ];
 
 // Active view-la kaattura statuses
@@ -29,6 +35,18 @@ const getEngineerStatus = (job) => {
   const ms = job.device?.mobileStatus;
   if (ms === "Delivered" || ms === "Delivered NR/NA") return "Delivered";
   return job.engineerStatus || STATUS_ALIAS[ms] || "Received";
+};
+
+// Report-ku: cancelled-na "Cancelled", illena engineer status
+const getReportStatus = (job) => (job.isCancelled ? "Cancelled" : getEngineerStatus(job));
+
+// Return-ku munnaadi job entha active status-la irundhuchu nu statusLogs-la irundhu edukkum
+const getPreviousStatus = (job) => {
+  const logs = job.statusLogs || [];
+  for (let i = logs.length - 1; i >= 0; i--) {
+    if (ACTIVE_KEYS.includes(logs[i].status)) return logs[i].status;
+  }
+  return "Received";
 };
 
 const getStaleDays = (job) => {
@@ -57,7 +75,21 @@ const monthKey = (d) => {
   return `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, "0")}`;
 };
 
+// <input type="date"> format (YYYY-MM-DD, local time)
+const toInputDate = (d) => {
+  const x = new Date(d);
+  return `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, "0")}-${String(x.getDate()).padStart(2, "0")}`;
+};
+
+const startOfDayFrom = (str) => new Date(`${str}T00:00:00`);
+const endOfDayFrom   = (str) => new Date(`${str}T23:59:59.999`);
+
 const FADE_MS = 200; // old cards fade-out duration (filter change)
+
+const dateInputStyle = {
+  border: "1px solid #cbd5e1", borderRadius: 8, padding: "6px 10px",
+  fontSize: 12, background: "#fff", color: "#334155", outline: "none",
+};
 
 const StaleBadge = ({ days }) => {
   if (days < 2) return null;
@@ -105,6 +137,14 @@ const EngineerDashboard = () => {
   const [monthFilter,   setMonthFilter]   = useState("All");
   const [detailJob,     setDetailJob]     = useState(null);
 
+  // ── date filters ──
+  const [activeFrom, setActiveFrom] = useState("");
+  const [activeTo,   setActiveTo]   = useState("");
+  const [reportFrom, setReportFrom] = useState(() => {
+    const d = new Date(); d.setDate(d.getDate() - 6); return toInputDate(d);
+  });
+  const [reportTo,   setReportTo]   = useState(() => toInputDate(new Date()));
+
   const [newStepText,    setNewStepText]    = useState({});
   const [newStepNote,    setNewStepNote]    = useState({});
   const [stepLoading,    setStepLoading]    = useState(null);
@@ -145,13 +185,35 @@ const EngineerDashboard = () => {
   useEffect(() => { if (engineerName) fetchJobs(); }, [engineerName]);
 
   const handleStatusUpdate = async (jobId, newStatus) => {
+    // Accident-ah Return click pannaadhu-kaaga confirm
+    if (newStatus === "Return") {
+      const ok = window.confirm("Are you sure you want to mark this job as Return?\n(You can restore it later from the Return tab.)");
+      if (!ok) return;
+    }
     setUpdating(jobId);
     try {
       await axios.patch(`${API}/api/jobsheets/${jobId}/status`, { status: newStatus, updatedBy: engineerName });
       setJobs(prev => prev.map(j => j._id === jobId
         ? { ...j, engineerStatus: newStatus, statusLogs: [...(j.statusLogs || []), { status: newStatus, updatedBy: engineerName, timestamp: new Date() }] }
         : j));
-    } catch { alert("Update failed"); }
+      return true;
+    } catch { alert("Update failed"); return false; }
+    finally { setUpdating(null); }
+  };
+
+  // Return-la irundhu thirumba Active-ku kondu varradhu
+  const handleRestore = async (job, targetStatus) => {
+    const target = targetStatus || getPreviousStatus(job);
+    const ok = window.confirm(`Restore ${job.jobSheetNo} to "${target}"?`);
+    if (!ok) return;
+    setUpdating(job._id);
+    try {
+      await axios.patch(`${API}/api/jobsheets/${job._id}/status`, { status: target, updatedBy: engineerName });
+      setJobs(prev => prev.map(j => j._id === job._id
+        ? { ...j, engineerStatus: target, statusLogs: [...(j.statusLogs || []), { status: target, updatedBy: engineerName, timestamp: new Date(), note: "Restored from Return" }] }
+        : j));
+      setDetailJob(null);
+    } catch { alert("Restore failed"); }
     finally { setUpdating(null); }
   };
 
@@ -212,6 +274,25 @@ const EngineerDashboard = () => {
     }
   };
 
+  // Report quick presets
+  const applyReportPreset = (kind) => {
+    const now = new Date();
+    const today = toInputDate(now);
+    if (kind === "today") { setReportFrom(today); setReportTo(today); }
+    else if (kind === "7d") {
+      const d = new Date(now); d.setDate(d.getDate() - 6);
+      setReportFrom(toInputDate(d)); setReportTo(today);
+    }
+    else if (kind === "month") {
+      setReportFrom(toInputDate(new Date(now.getFullYear(), now.getMonth(), 1))); setReportTo(today);
+    }
+    else if (kind === "lastMonth") {
+      setReportFrom(toInputDate(new Date(now.getFullYear(), now.getMonth() - 1, 1)));
+      setReportTo(toInputDate(new Date(now.getFullYear(), now.getMonth(), 0)));
+    }
+    else if (kind === "all") { setReportFrom(""); setReportTo(""); }
+  };
+
   /* ================= DERIVED DATA ================= */
   const q = search.toLowerCase();
   const matchesSearch = (j) =>
@@ -248,16 +329,24 @@ const EngineerDashboard = () => {
     let list = buckets.active.filter(matchesSearch);
     if (statusFilter !== "All") list = list.filter(j => getEngineerStatus(j) === statusFilter);
     if (staleOnly) list = list.filter(j => getStaleDays(j) >= 3);
+    if (activeFrom) {
+      const s = startOfDayFrom(activeFrom);
+      list = list.filter(j => new Date(j.createdAt) >= s);
+    }
+    if (activeTo) {
+      const e = endOfDayFrom(activeTo);
+      list = list.filter(j => new Date(j.createdAt) <= e);
+    }
     list = [...list].sort((a, b) =>
       sortOrder === "oldest"
         ? new Date(a.createdAt) - new Date(b.createdAt)
         : new Date(b.createdAt) - new Date(a.createdAt)
     );
     return list;
-  }, [buckets, search, statusFilter, staleOnly, sortOrder]);
+  }, [buckets, search, statusFilter, staleOnly, sortOrder, activeFrom, activeTo]);
 
   /* ── filter change: old cards fade-out -> new cards fade-in ── */
-  const filterSig = `${statusFilter}|${staleOnly}|${sortOrder}`;
+  const filterSig = `${statusFilter}|${staleOnly}|${sortOrder}|${activeFrom}|${activeTo}`;
   const prevSig   = useRef(filterSig);
   const [shownActive, setShownActive] = useState(activeList);
   const [leaving,     setLeaving]     = useState(false);
@@ -296,6 +385,7 @@ const EngineerDashboard = () => {
     [buckets, search]
   );
 
+  // Overall stat cards (date filter-ku sambandham illa)
   const report = useMemo(() => {
     const now = new Date();
     const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -303,11 +393,6 @@ const EngineerDashboard = () => {
     const thisMonth = monthKey(now);
 
     let today = 0, week = 0, month = 0, turnaroundSum = 0, turnaroundCount = 0;
-    const days = [];
-    for (let i = 6; i >= 0; i--) {
-      const d = new Date(startOfDay); d.setDate(d.getDate() - i);
-      days.push({ date: d, label: d.toLocaleDateString("en-IN", { weekday: "short" }), count: 0 });
-    }
 
     buckets.delivered.forEach(j => {
       const dd = getDeliveredDate(j);
@@ -318,19 +403,79 @@ const EngineerDashboard = () => {
         const diff = (dd - new Date(j.createdAt)) / (1000 * 60 * 60 * 24);
         if (diff >= 0) { turnaroundSum += diff; turnaroundCount++; }
       }
-      days.forEach(d => {
-        if (dd >= d.date && dd < new Date(d.date.getTime() + 24 * 60 * 60 * 1000)) d.count++;
-      });
     });
 
     return {
       today, week, month,
       total: buckets.delivered.length,
       avgTurnaround: turnaroundCount ? (turnaroundSum / turnaroundCount).toFixed(1) : "-",
-      days,
-      maxDay: Math.max(1, ...days.map(d => d.count)),
     };
   }, [buckets]);
+
+  // Date range -> status-wise (stacked) graph data. Basis: job received date (createdAt)
+  const rangeReport = useMemo(() => {
+    const empty = { columns: [], totals: {}, total: 0, maxTotal: 1, monthly: false };
+    if (jobs.length === 0) return empty;
+
+    const earliest = jobs.reduce((m, j) => Math.min(m, new Date(j.createdAt).getTime()), Date.now());
+    const s = reportFrom ? startOfDayFrom(reportFrom) : new Date(new Date(earliest).setHours(0, 0, 0, 0));
+    const e = reportTo   ? endOfDayFrom(reportTo)     : new Date();
+    if (s > e) return empty;
+
+    const spanDays = Math.round((e - s) / (1000 * 60 * 60 * 24)) + 1;
+    const monthly  = spanDays > 62;
+
+    // columns build
+    const columns = [];
+    if (monthly) {
+      const cur = new Date(s.getFullYear(), s.getMonth(), 1);
+      while (cur <= e) {
+        columns.push({
+          key: monthKey(cur),
+          label: cur.toLocaleDateString("en-IN", { month: "short", year: "2-digit" }),
+          full: cur.toLocaleDateString("en-IN", { month: "long", year: "numeric" }),
+          counts: {}, total: 0,
+        });
+        cur.setMonth(cur.getMonth() + 1);
+      }
+    } else {
+      const cur = new Date(s.getFullYear(), s.getMonth(), s.getDate());
+      while (cur <= e) {
+        columns.push({
+          key: toInputDate(cur),
+          label: spanDays <= 7
+            ? cur.toLocaleDateString("en-IN", { weekday: "short", day: "numeric" })
+            : cur.toLocaleDateString("en-IN", { day: "numeric", month: "short" }),
+          full: cur.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }),
+          counts: {}, total: 0,
+        });
+        cur.setDate(cur.getDate() + 1);
+      }
+    }
+    const colMap = {};
+    columns.forEach(c => { colMap[c.key] = c; });
+
+    const totals = {};
+    REPORT_STATUSES.forEach(st => { totals[st.key] = 0; });
+    let total = 0;
+
+    jobs.forEach(j => {
+      const c = new Date(j.createdAt);
+      if (c < s || c > e) return;
+      const col = colMap[monthly ? monthKey(c) : toInputDate(c)];
+      if (!col) return;
+      const st = getReportStatus(j);
+      col.counts[st] = (col.counts[st] || 0) + 1;
+      col.total += 1;
+      totals[st] = (totals[st] || 0) + 1;
+      total += 1;
+    });
+
+    return {
+      columns, totals, total, monthly,
+      maxTotal: Math.max(1, ...columns.map(c => c.total)),
+    };
+  }, [jobs, reportFrom, reportTo]);
 
   const otherEngineers = engineerList
     .map(e => e.name || e)
@@ -345,6 +490,19 @@ const EngineerDashboard = () => {
   ];
   const activeNavIndex = Math.max(0, navItems.findIndex(n => n.key === view));
   const activeNav      = navItems[activeNavIndex];
+
+  /* ================= DATE RANGE INPUTS (reusable) ================= */
+  const renderDateRange = (from, to, setFrom, setTo) => (
+    <div style={{ display: "flex", alignItems: "center", gap: 6, background: "#fff", border: "1px solid #cbd5e1", borderRadius: 8, padding: "3px 10px" }}>
+      <Calendar size={13} color="#64748b" />
+      <span style={{ fontSize: 11, color: "#64748b", fontWeight: 600 }}>From</span>
+      <input type="date" value={from} max={to || undefined} onChange={e => setFrom(e.target.value)}
+        style={{ ...dateInputStyle, border: "none", padding: "5px 2px" }} />
+      <span style={{ fontSize: 11, color: "#64748b", fontWeight: 600 }}>To</span>
+      <input type="date" value={to} min={from || undefined} onChange={e => setTo(e.target.value)}
+        style={{ ...dateInputStyle, border: "none", padding: "5px 2px" }} />
+    </div>
+  );
 
   /* ================= JOB CARD (active view) ================= */
   const renderJobCard = (job, idx = 0) => {
@@ -530,6 +688,7 @@ const EngineerDashboard = () => {
               <th style={{ padding: "10px 14px" }}>Received</th>
               <th style={{ padding: "10px 14px" }}>{mode === "delivered" ? "Delivered" : "Updated"}</th>
               <th style={{ padding: "10px 14px" }}>Status</th>
+              {mode === "return" && <th style={{ padding: "10px 14px" }}>Action</th>}
             </tr>
           </thead>
           <tbody>
@@ -554,6 +713,21 @@ const EngineerDashboard = () => {
                     ? <span style={{ background: "#fee2e2", color: "#991b1b", padding: "3px 10px", borderRadius: 20, fontSize: 11, fontWeight: 700 }}>Cancelled</span>
                     : <StatusPill status={getEngineerStatus(j)} />}
                 </td>
+                {mode === "return" && (
+                  <td style={{ padding: "10px 14px" }}>
+                    {j.isCancelled ? (
+                      <span style={{ color: "#94a3b8", fontSize: 11 }}>-</span>
+                    ) : (
+                      <button
+                        onClick={e => { e.stopPropagation(); handleRestore(j); }}
+                        disabled={updating === j._id}
+                        title={`Restore to ${getPreviousStatus(j)}`}
+                        style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "5px 10px", borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: "pointer", border: "1px solid #10b981", background: "#ecfdf5", color: "#047857", opacity: updating === j._id ? 0.6 : 1 }}>
+                        {updating === j._id ? <Loader2 size={12} className="spin" /> : <RotateCcw size={12} />} Restore
+                      </button>
+                    )}
+                  </td>
+                )}
               </tr>
             ))}
           </tbody>
@@ -573,6 +747,11 @@ const EngineerDashboard = () => {
     delivered: "Delivered History",
     report: "My Report",
   }[view];
+
+  const presetBtn = {
+    padding: "6px 12px", borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: "pointer",
+    border: "1px solid #cbd5e1", background: "#fff", color: "#475569",
+  };
 
   return (
     <div style={{ minHeight: "100vh", background: "#f1f5f9" }}>
@@ -641,6 +820,26 @@ const EngineerDashboard = () => {
               {detailJob.service?.remarks && <div style={{ color: "#059669" }}>{detailJob.service.remarks}</div>}
               <div style={{ color: "#94a3b8" }}>Received: {fmtDate(detailJob.createdAt)}</div>
             </div>
+
+            {/* ── RESTORE / CHANGE STATUS (Return jobs mattum, cancelled-ku illa) ── */}
+            {!detailJob.isCancelled && getEngineerStatus(detailJob) === "Return" && (
+              <div style={{ background: "#ecfdf5", border: "1px solid #a7f3d0", borderRadius: 10, padding: 12, marginBottom: 14 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, fontWeight: 700, color: "#047857", marginBottom: 8 }}>
+                  <RotateCcw size={12} /> WRONG STATUS? MOVE BACK TO ACTIVE:
+                </div>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                  {STATUS_STEPS.filter(s => ACTIVE_KEYS.includes(s.key)).map(s => {
+                    const Icon = s.icon;
+                    return (
+                      <button key={s.key} onClick={() => handleRestore(detailJob, s.key)} disabled={updating === detailJob._id}
+                        style={{ display: "flex", alignItems: "center", gap: 5, padding: "5px 10px", borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: "pointer", border: `2px solid ${s.color}`, background: "#fff", color: s.color, opacity: updating === detailJob._id ? 0.6 : 1 }}>
+                        <Icon size={12} /> {s.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
 
             <div style={{ fontSize: 11, fontWeight: 700, color: "#64748b", marginBottom: 6 }}>REPAIR STEPS</div>
             {(detailJob.repairSteps || []).length === 0 ? (
@@ -823,8 +1022,12 @@ const EngineerDashboard = () => {
                       style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 14px", borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: "pointer", border: "1px solid #cbd5e1", background: "#fff", color: "#475569" }}>
                       <ArrowUpDown size={13} /> {sortOrder === "oldest" ? "Oldest first" : "Newest first"}
                     </button>
-                    {(statusFilter !== "All" || staleOnly) && (
-                      <button onClick={() => { setStatusFilter("All"); setStaleOnly(false); }}
+
+                    {/* date range filter (received date) */}
+                    {renderDateRange(activeFrom, activeTo, setActiveFrom, setActiveTo)}
+
+                    {(statusFilter !== "All" || staleOnly || activeFrom || activeTo) && (
+                      <button onClick={() => { setStatusFilter("All"); setStaleOnly(false); setActiveFrom(""); setActiveTo(""); }}
                         style={{ display: "flex", alignItems: "center", gap: 4, padding: "7px 12px", borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: "pointer", border: "none", background: "#fee2e2", color: "#991b1b" }}>
                         <X size={12} /> Clear filters
                       </button>
@@ -879,6 +1082,7 @@ const EngineerDashboard = () => {
               {/* ═════════ REPORT VIEW ═════════ */}
               {view === "report" && (
                 <>
+                  {/* overall stat cards */}
                   <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 20 }}>
                     {[
                       { label: "Delivered Today", value: report.today, color: "#059669" },
@@ -895,30 +1099,92 @@ const EngineerDashboard = () => {
                     ))}
                   </div>
 
+                  {/* date range filter bar */}
+                  <div style={{ display: "flex", gap: 10, marginBottom: 16, flexWrap: "wrap", alignItems: "center" }}>
+                    {renderDateRange(reportFrom, reportTo, setReportFrom, setReportTo)}
+                    <button style={presetBtn} onClick={() => applyReportPreset("today")}>Today</button>
+                    <button style={presetBtn} onClick={() => applyReportPreset("7d")}>7 Days</button>
+                    <button style={presetBtn} onClick={() => applyReportPreset("month")}>This Month</button>
+                    <button style={presetBtn} onClick={() => applyReportPreset("lastMonth")}>Last Month</button>
+                    <button style={presetBtn} onClick={() => applyReportPreset("all")}>All</button>
+                    <span style={{ fontSize: 12, color: "#94a3b8" }}>
+                      {rangeReport.total} job{rangeReport.total !== 1 ? "s" : ""} received in range
+                    </span>
+                  </div>
+
                   <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
-                    <div style={{ background: "#fff", borderRadius: 12, padding: 20, boxShadow: "0 1px 4px rgba(0,0,0,0.08)", flex: "1 1 380px" }}>
-                      <div style={{ fontSize: 13, fontWeight: 700, color: "#1e293b", marginBottom: 16 }}>Deliveries — last 7 days</div>
-                      <div style={{ display: "flex", alignItems: "flex-end", gap: 12, height: 150 }}>
-                        {report.days.map((d, i) => (
-                          <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-end", height: "100%" }}>
-                            <div style={{ fontSize: 11, fontWeight: 700, color: "#059669", marginBottom: 4 }}>{d.count}</div>
-                            <div style={{ width: "100%", maxWidth: 34, height: `${(d.count / report.maxDay) * 100}%`, minHeight: d.count ? 4 : 2, background: d.count ? "#10b981" : "#e2e8f0", borderRadius: "6px 6px 0 0", transition: "height .3s" }} />
-                            <div style={{ fontSize: 10, color: "#94a3b8", marginTop: 6 }}>{d.label}</div>
+                    {/* stacked status graph */}
+                    <div style={{ background: "#fff", borderRadius: 12, padding: 20, boxShadow: "0 1px 4px rgba(0,0,0,0.08)", flex: "1 1 380px", minWidth: 0 }}>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: "#1e293b", marginBottom: 4 }}>
+                        Jobs by status — {rangeReport.monthly ? "month wise" : "day wise"}
+                      </div>
+                      <div style={{ fontSize: 11, color: "#94a3b8", marginBottom: 12 }}>
+                        Received date vachu, job-oda ippo irukkura status
+                      </div>
+
+                      {/* legend */}
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 12, marginBottom: 14 }}>
+                        {REPORT_STATUSES.map(st => (
+                          <div key={st.key} style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11, color: "#475569", fontWeight: 600 }}>
+                            <span style={{ width: 10, height: 10, borderRadius: 3, background: st.color, display: "inline-block" }} />
+                            {st.label}
                           </div>
                         ))}
                       </div>
+
+                      {rangeReport.total === 0 ? (
+                        <div style={{ textAlign: "center", padding: "50px 0", color: "#94a3b8", display: "flex", flexDirection: "column", alignItems: "center", gap: 8 }}>
+                          <Inbox size={26} /> No jobs in this date range
+                        </div>
+                      ) : (
+                        <div style={{ overflowX: "auto" }}>
+                          <div style={{ display: "flex", alignItems: "flex-end", gap: rangeReport.columns.length > 20 ? 6 : 12, height: 200, minWidth: rangeReport.columns.length * 30 }}>
+                            {rangeReport.columns.map((col, i) => {
+                              const labelEvery = Math.ceil(rangeReport.columns.length / 14);
+                              const showLabel = i % labelEvery === 0;
+                              const tip = `${col.full}\n` + REPORT_STATUSES
+                                .filter(st => col.counts[st.key])
+                                .map(st => `${st.label}: ${col.counts[st.key]}`).join("\n");
+                              return (
+                                <div key={col.key} title={tip} style={{ flex: 1, minWidth: 22, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-end", height: "100%" }}>
+                                  <div style={{ fontSize: 10, fontWeight: 700, color: "#475569", marginBottom: 3, height: 14 }}>{col.total || ""}</div>
+                                  <div style={{
+                                    width: "100%", maxWidth: 38,
+                                    height: `${(col.total / rangeReport.maxTotal) * 140}px`,
+                                    minHeight: col.total ? 4 : 2,
+                                    background: col.total ? "transparent" : "#e2e8f0",
+                                    display: "flex", flexDirection: "column-reverse",
+                                    borderRadius: "6px 6px 0 0", overflow: "hidden",
+                                  }}>
+                                    {REPORT_STATUSES.map(st => {
+                                      const n = col.counts[st.key] || 0;
+                                      if (!n) return null;
+                                      return <div key={st.key} style={{ height: `${(n / col.total) * 100}%`, background: st.color, transition: "height .3s" }} />;
+                                    })}
+                                  </div>
+                                  <div style={{ fontSize: 10, color: "#94a3b8", marginTop: 6, height: 14, whiteSpace: "nowrap" }}>{showLabel ? col.label : ""}</div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
                     </div>
 
+                    {/* status breakdown for the range */}
                     <div style={{ background: "#fff", borderRadius: 12, padding: 20, boxShadow: "0 1px 4px rgba(0,0,0,0.08)", flex: "1 1 280px" }}>
-                      <div style={{ fontSize: 13, fontWeight: 700, color: "#1e293b", marginBottom: 14 }}>Current workload</div>
-                      {STATUS_STEPS.filter(s => ACTIVE_KEYS.includes(s.key)).map(s => {
-                        const cnt = activeCounts[s.key] || 0;
-                        const pct = buckets.active.length ? (cnt / buckets.active.length) * 100 : 0;
+                      <div style={{ fontSize: 13, fontWeight: 700, color: "#1e293b", marginBottom: 4 }}>Status breakdown</div>
+                      <div style={{ fontSize: 11, color: "#94a3b8", marginBottom: 14 }}>Selected date range-la mattum</div>
+                      {REPORT_STATUSES.map(s => {
+                        const cnt = rangeReport.totals[s.key] || 0;
+                        const pct = rangeReport.total ? (cnt / rangeReport.total) * 100 : 0;
                         return (
                           <div key={s.key} style={{ marginBottom: 12 }}>
                             <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 4 }}>
                               <span style={{ color: "#475569", fontWeight: 600 }}>{s.label}</span>
-                              <span style={{ color: s.color, fontWeight: 700 }}>{cnt}</span>
+                              <span style={{ color: s.color, fontWeight: 700 }}>
+                                {cnt} <span style={{ color: "#94a3b8", fontWeight: 500 }}>({pct.toFixed(0)}%)</span>
+                              </span>
                             </div>
                             <div style={{ background: "#f1f5f9", borderRadius: 4, height: 6 }}>
                               <div style={{ background: s.color, borderRadius: 4, height: 6, width: `${pct}%`, transition: "width .3s" }} />
