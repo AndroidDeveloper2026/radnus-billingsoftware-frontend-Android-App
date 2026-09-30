@@ -325,6 +325,7 @@ const JobSheetPage = ({ editData = null, isEdit = false }) => {
   // sees the new value — the second click is blocked for real.
   const savingRef = React.useRef(false);
   const updatingRef = React.useRef(false);
+  const originalStatusRef = React.useRef("");
   const pendingNextNo = React.useRef(null);
   const API = import.meta.env.VITE_API_URL;
   const loggedInUser = JSON.parse(sessionStorage.getItem("user") || "{}");
@@ -1153,10 +1154,22 @@ useEffect(() => {
       ? (balanceDate || todayStr)
       : "";
     try {
+            // Reception status-ah maathala na, DB-la ippo irukkura (engineer set panna) status-ah eduthuko
+      let statusToSend = mobileStatus;
+      if (mobileStatus === originalStatusRef.current) {
+        try {
+          const fresh = await axios.get(`${API}/api/jobsheets/${editData._id}`);
+          const freshJob = fresh.data?.job || fresh.data;
+          statusToSend = freshJob?.device?.mobileStatus ?? mobileStatus;
+          setMobileStatus(statusToSend);
+        } catch (e) {
+          console.error("Fresh status fetch failed", e);
+        }
+      }
       const formData = new FormData();
       formData.append("jobSheetNo", jobSheetNo);
       formData.append("customer", JSON.stringify({ name: customerName, contact, altContact, email, district, taluk }));
-      formData.append("device", JSON.stringify({ make: make === "__custom" ? customMake : make, model: model === "__custom" ? customModel : model, imei: isDeadPhone ? "DEAD" : imei, warranty, pattern, mobileStatus }));
+formData.append("device", JSON.stringify({ make: make === "__custom" ? customMake : make, model: model === "__custom" ? customModel : model, imei: isDeadPhone ? "DEAD" : imei, warranty, pattern, mobileStatus: statusToSend }));
       formData.append("physicalCondition", JSON.stringify(physicalCondition.filter(v => v !== "__custom")));
       formData.append("accessories", JSON.stringify(accessories.filter(v => v !== "__custom")));
       formData.append("advanceItems", JSON.stringify(advanceItems));
@@ -1207,7 +1220,7 @@ useEffect(() => {
 
       const updatedJob = res.data?.job || res.data;
       setLocalEditData(updatedJob);
-
+      originalStatusRef.current = updatedJob?.device?.mobileStatus ?? statusToSend;
       if (updatedJob?.service?.advanceDate) {
         setAdvanceDate(updatedJob.service.advanceDate.slice(0, 10));
       }
@@ -1430,7 +1443,7 @@ const today = new Date().toLocaleDateString("en-CA");
     setIdProofType(editData.device?.idProofType || "");
     setIdProofPreview(editData.idProofImage || "");
     setMobileStatus(editData.device?.mobileStatus || "");
-
+originalStatusRef.current = editData.device?.mobileStatus || "";
 
     const rawAdvDate = editData.service?.advanceDate;
     if (rawAdvDate) {
