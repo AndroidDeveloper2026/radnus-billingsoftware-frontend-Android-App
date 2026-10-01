@@ -4,6 +4,7 @@ import axios from "axios";
 import JobSheetSearchModal from "./JobSheetSearchModal";
 import SparePopup from "./SparePopup";
 import OthersPopup from "./OthersPopup";
+import RawSparePopup from "./popups/RawSparePopup";
 import Select from "react-select";
 import RepairStepsTimeline from "./RepairStepsTimeline";
 import CustomerAutocomplete from "./CustomerAutocomplete";
@@ -324,6 +325,7 @@ const JobSheetPage = ({ editData = null, isEdit = false }) => {
   // sees the new value — the second click is blocked for real.
   const savingRef = React.useRef(false);
   const updatingRef = React.useRef(false);
+  const originalStatusRef = React.useRef("");
   const pendingNextNo = React.useRef(null);
   const API = import.meta.env.VITE_API_URL;
   const loggedInUser = JSON.parse(sessionStorage.getItem("user") || "{}");
@@ -963,8 +965,9 @@ const today = new Date().toLocaleDateString("en-CA");
   const [serviceCharge, setServiceCharge] = useState("");
   const [spareCharge, setSpareCharge] = useState("");
   const [spareItems, setSpareItems] = useState([]);
-
+  const [rawSpareItems, setRawSpareItems] = useState([]);   // ✅ NEW
   const [sparePopup, setSparePopup] = useState(false);
+  const [showRawSparePopup, setShowRawSparePopup] = useState(false);
 
   const [paymentMode, setPaymentMode] = useState("");
   const [income, setIncome] = useState("");
@@ -977,16 +980,17 @@ const today = new Date().toLocaleDateString("en-CA");
   // If false, the date is auto-managed (today's date when Income changes).
   const [incomeDateTouched, setIncomeDateTouched] = useState(false);
 
-  // ================= INCOME + INCOME DATE MERGED FIELD =================
-  // Ref to the (visually hidden) native date input that lives inside the Income ₹ box.
-  // Clicking the calendar icon opens it via showPicker() so Income amount and Income
-  // Date share a single box instead of two separate fields.
-  const incomeDateRef = React.useRef(null);
 
-  // Holds the income value as it was when the job sheet was loaded/last saved,
-  // used to detect whether the user genuinely changed Income this session.
+  const incomeDateRef = React.useRef(null);
+  const [balance, setBalance] = useState("");
+  const [balanceDate, setBalanceDate] = useState("");
+  const [balanceDateTouched, setBalanceDateTouched] = useState(false);
+  const balanceDateRef = React.useRef(null);
   const initialIncomeRef = React.useRef(0);
    const spareBaselineRef = React.useRef(0);
+   const rawSpareBaselineRef = React.useRef(0);  // ✅ NEW — Raw Spare had no cycle-baseline before,
+                                                  // so it never went empty after a rebill. Mirrors
+                                                  // spareBaselineRef exactly.
    const advanceBaselineRef = React.useRef(0);   // ✅ NEW
      const othersBaselineRef = React.useRef(0);    // ✅ NEW
   const [repairDate, setRepairDate] = useState(today);
@@ -1010,10 +1014,29 @@ const today = new Date().toLocaleDateString("en-CA");
     setServiceCharge(remaining > 0 ? String(remaining) : "0");
   }, [income, spareCharge, othersAmount]);
 
-  useEffect(() => {
-    const total = (spareItems || []).reduce((s, it) => s + Number(it.amount || 0), 0);
-    setSpareCharge(String(total));
-  }, [spareItems]);
+ useEffect(() => {
+  // ✅ FIX — was summing ALL items including Returned ones, so a Returned
+  // spare kept inflating spareCharge (and the Spare Used field) even after
+  // the popup itself correctly showed ₹0. Exclude isReturned, matching the
+  // same total SparePopup's own handleSave already computes.
+  const total = (spareItems || [])
+    .filter((it) => !it.isReturned)
+    .reduce((s, it) => s + Number(it.amount || 0), 0);
+  setSpareCharge(String(total));
+}, [spareItems]);
+
+  // ✅ Raw Spare total — accumulates exactly like Spare Charges, from rawSpareItems
+  const [rawSpareCharge, setRawSpareCharge] = useState("");
+useEffect(() => {
+  // ✅ FIX — same bug as spareCharge above: was summing every rawSpareItems
+  // entry regardless of Return status, so a Returned raw purchase kept
+  // showing up in the "Raw Spare (Raw)" field even though the popup itself
+  // correctly showed ₹0 Raw Spare Total.
+  const total = (rawSpareItems || [])
+    .filter((it) => !it.isReturned)
+    .reduce((s, it) => s + Number(it.amount || 0), 0);
+  setRawSpareCharge(String(total));
+}, [rawSpareItems]);
   /* ================= VISUAL ISSUES ================= */
   const addIssue = () => setVisualIssues([...visualIssues, ""]);
   const updateIssue = (i, val) => {
@@ -1126,26 +1149,53 @@ const today = new Date().toLocaleDateString("en-CA");
     const finalIncomeDate = incomeNum > 0
       ? (incomeDate || todayStr)
       : "";
+          const balanceNum = Number(balance || 0);
+    const finalBalanceDate = balanceNum > 0
+      ? (balanceDate || todayStr)
+      : "";
     try {
+            // Reception status-ah maathala na, DB-la ippo irukkura (engineer set panna) status-ah eduthuko
+      let statusToSend = mobileStatus;
+      if (mobileStatus === originalStatusRef.current) {
+        try {
+          const fresh = await axios.get(`${API}/api/jobsheets/${editData._id}`);
+          const freshJob = fresh.data?.job || fresh.data;
+          statusToSend = freshJob?.device?.mobileStatus ?? mobileStatus;
+          setMobileStatus(statusToSend);
+        } catch (e) {
+          console.error("Fresh status fetch failed", e);
+        }
+      }
       const formData = new FormData();
       formData.append("jobSheetNo", jobSheetNo);
       formData.append("customer", JSON.stringify({ name: customerName, contact, altContact, email, district, taluk }));
-      formData.append("device", JSON.stringify({ make: make === "__custom" ? customMake : make, model: model === "__custom" ? customModel : model, imei: isDeadPhone ? "DEAD" : imei, warranty, pattern, mobileStatus }));
+formData.append("device", JSON.stringify({ make: make === "__custom" ? customMake : make, model: model === "__custom" ? customModel : model, imei: isDeadPhone ? "DEAD" : imei, warranty, pattern, mobileStatus: statusToSend }));
       formData.append("physicalCondition", JSON.stringify(physicalCondition.filter(v => v !== "__custom")));
       formData.append("accessories", JSON.stringify(accessories.filter(v => v !== "__custom")));
       formData.append("advanceItems", JSON.stringify(advanceItems));
       formData.append("visualIssues", JSON.stringify(visualIssues.filter(Boolean)));
-    formData.append("service", JSON.stringify({
+   formData.append("service", JSON.stringify({
   engineer,
   dealer, drawer, serviceRep,
   serviceCharge: Number(serviceCharge || 0),
   spareCharge: Number(spareCharge || 0),
-  spareBaseline: spareBaselineRef.current,   // 👈 இந்த ஒரு line add பண்ணு
-    advanceBaseline: advanceBaselineRef.current, 
-    othersBaseline: othersBaselineRef.current,   // ✅ NEW
+  rawSpareCharge: Number(rawSpareCharge || 0),   // ✅ NEW — this was missing, so
+                                                  // service.rawSpareCharge never got
+                                                  // saved to DB, so Reports (All
+                                                  // Report, ServiceRep Report) that
+                                                  // read this field always showed
+                                                  // stale/blank Raw Spare, even
+                                                  // though the Job Sheet page itself
+                                                  // showed the correct live value
+                                                  // (computed from rawSpareItems).
+  spareBaseline: spareBaselineRef.current,
+  rawSpareBaseline: rawSpareBaselineRef.current,
+  advanceBaseline: advanceBaselineRef.current, 
+  othersBaseline: othersBaselineRef.current,
   income: incomeNum,
   incomeDate: finalIncomeDate,
-
+  balance: balanceNum,
+  balanceDate: finalBalanceDate,
   othersAmount: Number(othersAmount || 0),
   othersItems,
   paymentMode, repairDate, deliveryDate,
@@ -1156,6 +1206,7 @@ const today = new Date().toLocaleDateString("en-CA");
   remarks,
 }));
       formData.append("spareItems", JSON.stringify(spareItems));
+          formData.append("rawSpareItems", JSON.stringify(rawSpareItems)); 
       formData.append("idProofType", idProofType);
       if (idProofImage && typeof idProofImage !== "string") {
         formData.append("idProofImage", idProofImage);
@@ -1169,7 +1220,7 @@ const today = new Date().toLocaleDateString("en-CA");
 
       const updatedJob = res.data?.job || res.data;
       setLocalEditData(updatedJob);
-
+      originalStatusRef.current = updatedJob?.device?.mobileStatus ?? statusToSend;
       if (updatedJob?.service?.advanceDate) {
         setAdvanceDate(updatedJob.service.advanceDate.slice(0, 10));
       }
@@ -1234,7 +1285,10 @@ const today = new Date().toLocaleDateString("en-CA");
     const finalIncomeDate = incomeNum > 0
       ? (incomeDate || todayStr)
       : "";
-
+    const balanceNum = Number(balance || 0);
+    const finalBalanceDate = balanceNum > 0
+      ? (balanceDate || todayStr)
+      : "";
     try {
       const formData = new FormData();
       formData.append("jobSheetNo", jobSheetNo);
@@ -1244,16 +1298,18 @@ const today = new Date().toLocaleDateString("en-CA");
       formData.append("accessories", JSON.stringify(accessories.filter(v => v !== "__custom")));
       formData.append("advanceItems", JSON.stringify(advanceItems));
       formData.append("visualIssues", JSON.stringify(visualIssues.filter(Boolean)));
-      formData.append("service", JSON.stringify({
+             formData.append("service", JSON.stringify({
         engineer,
         dealer, drawer, serviceRep,
         instaFollowers,
         googleReview, advanceDate,
         serviceCharge: Number(serviceCharge || 0),
         spareCharge: Number(spareCharge || 0),
+        rawSpareCharge: Number(rawSpareCharge || 0),   // ✅ NEW — same fix, missing on Save too
         income: incomeNum,
         incomeDate: finalIncomeDate,
-
+        balance: balanceNum,
+        balanceDate: finalBalanceDate,
         othersAmount: Number(othersAmount || 0),
         othersItems,
         paymentMode, repairDate, deliveryDate, remarks,
@@ -1261,6 +1317,7 @@ const today = new Date().toLocaleDateString("en-CA");
         margin: Number(margin || 0)
       }));
       formData.append("spareItems", JSON.stringify(spareItems));
+            formData.append("rawSpareItems", JSON.stringify(rawSpareItems)); 
       formData.append("idProofType", idProofType);
       if (idProofImage) formData.append("idProofImage", idProofImage);
       formData.append("createdBy", JSON.stringify({ username: user.username, role: user.role }));
@@ -1324,12 +1381,17 @@ const today = new Date().toLocaleDateString("en-CA");
     setOthersAmount("");
     setOthersItems([]);
        setSpareItems([]);
+         setRawSpareItems([]);   // ✅ NEW
     spareBaselineRef.current = 0;
+    rawSpareBaselineRef.current = 0;  // ✅ NEW
     advanceBaselineRef.current = 0;   // ✅ NEW
     othersBaselineRef.current = 0;    // ✅ NEW
     setIncome("");
     setIncomeDate("");
     setIncomeDateTouched(false); // reset manual-pick flag on New
+    setBalance("");
+    setBalanceDate("");
+    setBalanceDateTouched(false);
     initialIncomeRef.current = 0;
     setPaymentMode("");
     setRemarks("");
@@ -1381,7 +1443,7 @@ const today = new Date().toLocaleDateString("en-CA");
     setIdProofType(editData.device?.idProofType || "");
     setIdProofPreview(editData.idProofImage || "");
     setMobileStatus(editData.device?.mobileStatus || "");
-
+originalStatusRef.current = editData.device?.mobileStatus || "";
 
     const rawAdvDate = editData.service?.advanceDate;
     if (rawAdvDate) {
@@ -1400,13 +1462,10 @@ const today = new Date().toLocaleDateString("en-CA");
     setServiceCharge(editData.service?.serviceCharge || "");
            setSpareCharge(editData.service?.spareCharge || "");
     setSpareItems(editData.spareItems || []);
+    setRawSpareItems(editData.rawSpareItems || []);   // ✅ NEW — was missing, Raw Spare never loaded on reopen
     // ✅ FIX — always trust the baseline stored in DB (set at rebill time).
-    // rebillPending only tracks whether "Save Rebill" was clicked yet —
-    // it does NOT mean the cycle has changed. Resetting baseline to 0 when
-    // rebillPending turns false was wiping out the correct baseline on
-    // every reopen after the first save, causing the full cumulative spare
-    // total to count as "current cycle" instead of just the new spares.
     spareBaselineRef.current = Number(editData.service?.spareBaseline || 0);
+    rawSpareBaselineRef.current = Number(editData.service?.rawSpareBaseline || 0);  // ✅ NEW
     advanceBaselineRef.current = Number(editData.service?.advanceBaseline || 0); 
      othersBaselineRef.current = Number(editData.service?.othersBaseline || 0);
     setOthersAmount(editData.service?.othersAmount || "");
@@ -1418,8 +1477,15 @@ const today = new Date().toLocaleDateString("en-CA");
         ? new Date(editData.service.incomeDate).toISOString().slice(0, 10)
         : ""
     );
-    setIncomeDateTouched(false); // reset — opening an existing sheet is not a "manual pick"
+      setIncomeDateTouched(false); // reset — opening an existing sheet is not a "manual pick"
     initialIncomeRef.current = Number(editData.service?.income || 0);
+    setBalance(editData.service?.balance || "");
+    setBalanceDate(
+      editData.service?.balanceDate
+        ? new Date(editData.service.balanceDate).toISOString().slice(0, 10)
+        : ""
+    );
+    setBalanceDateTouched(false);
     setPaymentMode(editData.service?.paymentMode || "");
     setRepairDate(editData.service?.repairDate?.slice(0, 10) || today);
     setDeliveryDate(editData.service?.deliveryDate?.slice(0, 10) || "");
@@ -2407,7 +2473,54 @@ const today = new Date().toLocaleDateString("en-CA");
                           </div>
                         )}
                       </div>
-
+                      <div className="col-md-6">
+                        <Field label="Balance ₹">
+                          <div
+                            className="form-control form-control-sm d-flex align-items-center"
+                            style={{ padding: "0 6px", gap: 6, position: "relative" }}
+                          >
+                            <input
+                              type="text"
+                              placeholder="0"
+                              value={balance}
+                              onChange={(e) => setBalance(onlyNumbers(e.target.value))}
+                              style={{
+                                border: "none", outline: "none", flex: 1, minWidth: 0,
+                                background: "transparent", padding: "4px 2px",
+                                color: "#111827", fontWeight: 500,
+                              }}
+                            />
+                            <Calendar
+                              size={15}
+                              style={{ color: balanceDate ? "#0d6efd" : "#6B7280", cursor: "pointer", flexShrink: 0 }}
+                              onClick={() => {
+                                const el = balanceDateRef.current;
+                                if (el?.showPicker) el.showPicker();
+                                else el?.focus();
+                              }}
+                            />
+                            <input
+                              ref={balanceDateRef}
+                              type="date"
+                              value={balanceDate}
+                              onChange={(e) => {
+                                setBalanceDate(e.target.value);
+                                setBalanceDateTouched(true);
+                              }}
+                              style={{
+                                position: "absolute", top: 0, right: 0,
+                                width: 1, height: 1, opacity: 0,
+                                border: "none", padding: 0, pointerEvents: "none",
+                              }}
+                            />
+                          </div>
+                        </Field>
+                        {balanceDate && (
+                          <div style={{ fontSize: 10, color: "#0d6efd", marginTop: 2, fontWeight: 500 }}>
+                            📅 {balanceDateTouched ? "Manually selected" : "Auto-recorded"}: {balanceDate}
+                          </div>
+                        )}
+                      </div>
                       <div className="col-md-6">
                         <Field label="Service Charges ">
                           <input
@@ -2422,7 +2535,7 @@ const today = new Date().toLocaleDateString("en-CA");
                       </div>
 
                     <div className="col-md-6">
-  <Field label="Spare Charges ">
+  <Field label="Spare Charges (Used) ">
     <input
       type="text"
       className="form-control form-control-sm"
@@ -2438,6 +2551,28 @@ const today = new Date().toLocaleDateString("en-CA");
     />
   </Field>
 </div>
+                    <div className="col-md-6">
+                      {/* 🔴 FIX — Raw Spare previously showed the FULL lifetime total, even
+                          right after a rebill, because nothing was ever subtracted from it.
+                          Now subtracts rawSpareBaselineRef (set from service.rawSpareBaseline,
+                          snapshotted by the backend /rebill route), same pattern already used
+                          for Spare Charges / Other Expenses / Advance Amount below. */}
+                      <Field label="Raw Spare (Raw)">
+                        <input
+                          type="text"
+                          className="form-control form-control-sm"
+                          placeholder="Tap to add"
+                          value={
+                            Math.max(0, Number(rawSpareCharge || 0) - rawSpareBaselineRef.current) > 0
+                              ? Math.max(0, Number(rawSpareCharge || 0) - rawSpareBaselineRef.current)
+                              : ""
+                          }
+                          readOnly
+                          onClick={() => setShowRawSparePopup(true)}
+                          style={{ cursor: "pointer", background: "#f8f9fa" }}
+                        />
+                      </Field>
+                    </div>
                       <div className="col-md-6">
                         <Field label="Other Expenses">
                           <input
@@ -2460,7 +2595,7 @@ const today = new Date().toLocaleDateString("en-CA");
                           </div>
                         )}
                       </div>
-                     <div className="col-md-6">
+                                         <div className="col-md-6">
   <Field label="Advance Amount ">
     <input
       type="text"
@@ -2481,6 +2616,7 @@ const today = new Date().toLocaleDateString("en-CA");
                             <Wallet size={11} /> {advanceItems.length} payment{advanceItems.length > 1 ? "s" : ""}
                           </div>
                         )}
+                      
                       </div>
 
                       <div className="col-md-6">
@@ -2788,6 +2924,8 @@ const today = new Date().toLocaleDateString("en-CA");
     existingItems={spareItems}
     referenceData={{ income, service: serviceCharge, others: othersAmount, advance: advanceAmount }}
     spareBaselineAmount={spareBaselineRef.current}
+        setRawSpareItems={setRawSpareItems}          // ✅ NEW
+    existingRawItems={rawSpareItems}
   />
 )}
           {showOthersPopup && (
@@ -2800,7 +2938,6 @@ const today = new Date().toLocaleDateString("en-CA");
               referenceData={{ income, service: serviceCharge, spare: spareCharge, advance: advanceAmount }}
             />
           )}
-
           {showAdvancePopup && (
             <AdvancePopup
               onClose={() => setShowAdvancePopup(false)}
@@ -2812,6 +2949,15 @@ const today = new Date().toLocaleDateString("en-CA");
             />
           )}
 
+                {showRawSparePopup && (
+            <RawSparePopup
+              onClose={() => setShowRawSparePopup(false)}
+              setRawSpareItems={setRawSpareItems}
+              existingRawItems={rawSpareItems}
+              // ✅ NEW — "Before Rebill" gray split, same as SparePopup's spareBaselineAmount
+              rawSpareBaselineAmount={rawSpareBaselineRef.current}
+            />
+          )}
      {isEdit && editData?._id && (
             <RepairStepsTimeline jobId={editData._id} />
           )}
@@ -2886,7 +3032,23 @@ const today = new Date().toLocaleDateString("en-CA");
             <Home size={16} /> Home
           </button>
 
-          <button style={{ ...sideBtnNew, width: "auto" }} onClick={() => navigate("/jobsheet/new")}>
+          {/* 🔴 FIX — this button previously only navigated ("/jobsheet/new") without ever
+              calling handleNew(). If your router renders /jobsheet/new through the SAME
+              route/component as /jobsheet/:id (no remount on param change — very common
+              setup), every field's local state (income, rawSpareItems, spareItems,
+              jobSheetNo, spareBaselineRef, etc.) from whatever job sheet you were just
+              editing stayed exactly as-is on the "new" screen. That stale state could
+              then get POSTed as a brand-new job sheet, or otherwise confuse what you see
+              when you navigate back and forth between job sheets. Calling handleNew()
+              FIRST guarantees a clean, fully-reset form every time — regardless of
+              whether the router actually remounts the component or not. */}
+          <button
+            style={{ ...sideBtnNew, width: "auto" }}
+            onClick={() => {
+              handleNew();
+              navigate("/jobsheet/new");
+            }}
+          >
             <Plus size={16} /> New
           </button>
 
@@ -2912,7 +3074,14 @@ const today = new Date().toLocaleDateString("en-CA");
                   setSpareItems(res.data.spareItems || []);
                   spareBaselineRef.current = (res.data.spareItems || [])
                     .reduce((s, it) => s + Number(it.amount || 0), 0);
-                    
+
+                  // ✅ NEW — Raw Spare now gets the same cycle-baseline treatment as Spare:
+                  // rawSpareItems stays cumulative (full history), but rawSpareBaseline
+                  // (returned fresh from the /rebill route) makes the outer field's NET
+                  // total show empty for this new cycle.
+                  setRawSpareItems(res.data.rawSpareItems || []);
+                  rawSpareBaselineRef.current = Number(res.data.service?.rawSpareBaseline || 0);
+
                     advanceBaselineRef.current = Number(res.data.service?.advanceBaseline || 0);  
 
                   // ✅ FIX — compute baseline directly from the items array (like Spare does),
@@ -2925,6 +3094,14 @@ const today = new Date().toLocaleDateString("en-CA");
                   setIncome("");
                   setIncomeDate("");
                   setIncomeDateTouched(false);
+                  // ✅ FIX — Balance and Payment Mode were never reset here before, so the
+                  // OLD cycle's balance amount and payment method silently carried into the
+                  // new cycle. The backend /rebill route now resets both in the DB too —
+                  // this mirrors that on the form so the fields show empty immediately.
+                  setBalance("");
+                  setBalanceDate("");
+                  setBalanceDateTouched(false);
+                  setPaymentMode("");
                   // ✅ FIX — must equal the baseline, NOT "". Others has no auto-sync
                   // useEffect like Spare's spareCharge, so leaving this "" would wipe
                   // DB's othersAmount to 0 on the very next Update.
