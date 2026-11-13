@@ -10,6 +10,7 @@ import DrawerPopup from "./popups/DrawerPopup";
 import EngineerPopup from "./popups/EngineerPopup";
 import UserAddition from "./popups/UserAddition";
 import UserListPopup from "./popups/UserListPopup";
+import StoreManagementPopup from "./popups/StoreManagementPopup";
 import DistrictTalukPopup from "./popups/Districttalukpopup"
 
 const COLLAPSED_W = 64;
@@ -69,11 +70,13 @@ const JobSheetSidebar = () => {
   const [showEngineerModal, setShowEngineerModal] = useState(false);
   const [showUserModal, setShowUserModal] = useState(false);
   const [showUserList, setShowUserList] = useState(false);
+  const [showStoreModal, setShowStoreModal] = useState(false);
   const [showDistrictTalukModal, setShowDistrictTalukModal] = useState(false);
 
   const handleLogout = () => {
     sessionStorage.removeItem("token");
     sessionStorage.removeItem("user");
+    sessionStorage.removeItem("activeStoreId");   // ✅ multi-store
     navigate("/");
   };
 
@@ -188,7 +191,7 @@ const JobSheetSidebar = () => {
           <Label>Job Sheet</Label>
         </div>
 
-        {role === "admin" && (
+        {["admin", "storeManager"].includes(role) && (
           <div
             onMouseEnter={() => handleGroupHover(setAdminOpen, true)}
             onMouseLeave={() => handleGroupHover(setAdminOpen, false)}
@@ -224,6 +227,9 @@ const JobSheetSidebar = () => {
             >
               <div style={{ overflow: "hidden" }}>
                 <div style={{ paddingLeft: 26, paddingTop: 2 }}>
+                  {role === "admin" && (
+                    <div style={subBtn} onClick={() => { setShowStoreModal(true); setMobileOpen(false); }}>Store Management</div>
+                  )}
                   <div style={subBtn} onClick={() => { setShowEngineerModal(true); setMobileOpen(false); }}>Engineer Addition</div>
                   <div style={subBtn} onClick={() => { setShowUserList(true); setMobileOpen(false); }}>User List</div>
                   <div style={subBtn} onClick={() => { setShowUserModal(true); setMobileOpen(false); }}>User Addition</div>
@@ -233,6 +239,7 @@ const JobSheetSidebar = () => {
           </div>
         )}
 
+        {role !== "gm" && (
         <div
           onMouseEnter={() => handleGroupHover(setDataOpen, true)}
           onMouseLeave={() => handleGroupHover(setDataOpen, false)}
@@ -277,6 +284,7 @@ const JobSheetSidebar = () => {
             </div>
           </div>
         </div>
+        )}
 
         <div
           title="Report"
@@ -371,6 +379,7 @@ const JobSheetSidebar = () => {
       {showEngineerModal      && <EngineerPopup       onClose={() => setShowEngineerModal(false)} />}
       {showUserModal          && <UserAddition        onClose={() => setShowUserModal(false)} />}
       {showUserList           && <UserListPopup       onClose={() => setShowUserList(false)} />}
+      {showStoreModal         && <StoreManagementPopup onClose={() => setShowStoreModal(false)} />}
       {showDistrictTalukModal && <DistrictTalukPopup  onClose={() => setShowDistrictTalukModal(false)} />}
     </>
   );

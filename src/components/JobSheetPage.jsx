@@ -26,11 +26,7 @@ const isRequired = (value) => value && value.toString().trim().length > 0;
 
 const onlyNumbers = (value) => value.replace(/\D/g, "");
 
-/* ================= FREE TYPO-TOLERANT FUZZY SEARCH =================
-   No API/cost — plain Levenshtein edit-distance. Used as a custom filterOption for the
-   Make / Model / Fault / Physical Condition / Accessories react-select dropdowns so a typo
-   like "Semsung" still finds "Samsung" in the master list. Since the user still has to PICK
-   an option from the list, the saved value is always the correctly-spelled master entry. */
+ 
 const levenshtein = (a, b) => {
   const m = a.length, n = b.length;
   if (m === 0) return n;
@@ -56,7 +52,7 @@ const fuzzyFilterOption = (option, inputValue) => {
   return label.split(/\s+/).some(word => levenshtein(word, input) <= maxDist);
 };
 
-/* ================= RADNUS THEME (SOFTENED) ================= */
+
 const RED = "#DC2626";
 const RED_SOFT_BG = "#FEF2F2";
 const RED_TEXT = "#B91C1C";
@@ -70,7 +66,6 @@ const AMBER_BORDER = "#FDE9C0";
 const GRAY_TEXT = "#374151";
 const GRAY_BORDER = "#E5E7EB";
 
-// sideBtnBase — padding & margin kammi
 const sideBtnBase = {
   width: "100%", textAlign: "left", padding: "7px 14px",
   borderRadius: 7, fontWeight: 600, fontSize: 12.5,
@@ -79,10 +74,6 @@ const sideBtnBase = {
   color: "#fff",
 };
 
-/* ================= FIELD LABEL — persistent label above every input =================
-   Fixes: once a value is typed, the placeholder disappears and the user can no longer tell
-   which field they're looking at (e.g. Income vs Service Charges). A small permanent label
-   above the field solves this for new/first-time users at a new store. */
 const FieldLabel = ({ children, required }) => (
   <label
     className="d-block"
@@ -106,11 +97,6 @@ const Field = ({ label, required, children }) => (
   </div>
 );
 
-/* ================= MODERN FIELD VALIDATION MESSAGES =================
-   Replaces the old plain "⚠️ Customer Name is required" text with a small pill-style
-   message that has an icon, a soft background, and a gentle slide/fade-in animation so
-   it doesn't just "pop" into existence. Used everywhere formErrors used to be rendered
-   directly. FieldSuccess is the green equivalent for "✅ looks good" states. */
 const FieldError = ({ children }) => (
   <div
     style={{
@@ -147,11 +133,7 @@ const FieldSuccess = ({ children }) => (
   </div>
 );
 
-/* ================= MODERN TOAST NOTIFICATIONS =================
-   Drop-in replacement for every window.alert(...) call in this page. Toasts stack in the
-   top-right corner, auto-dismiss after ~4s, can be clicked away early, and are styled per
-   type (success / error / warning / info) instead of the browser's plain alert box.
-   Usage: showToast("Job Sheet Saved", "success") */
+
 const TOAST_STYLES = {
   success: { accent: "#16A34A", bg: "#F0FDF4", icon: CheckCircle2 },
   error: { accent: "#DC2626", bg: "#FEF2F2", icon: AlertCircle },
@@ -204,6 +186,7 @@ const Toast = ({ toast, onDismiss }) => {
   );
 };
 
+
 const ToastContainer = ({ toasts, onDismiss }) => (
   <div
     style={{
@@ -220,7 +203,6 @@ const ToastContainer = ({ toasts, onDismiss }) => (
   </div>
 );
 
-/* ================= BOTTOM ACTION BAR — SOLID COLORFUL BUTTONS ================= */
 const sideBtnSave = { ...sideBtnBase, background: "#DC2626" };       // Save / Update — red
 const sideBtnRefresh = { ...sideBtnBase, background: "#475569" };    // Refresh — slate
 const sideBtnEstimate = { ...sideBtnBase, background: "#2563EB" };   // Estimate — blue
@@ -237,7 +219,8 @@ const redHeader = {
   padding: "6px 12px", fontSize: 13
 };
 
-/* ================= YELLOW HEADER — DARKENED ================= */
+
+
 const yellowHeader = {
   background: "#FDE68A", color: "#7C2D12", fontWeight: 700,
   borderBottom: "1px solid #F59E0B", letterSpacing: 0.2,
@@ -259,9 +242,7 @@ const selectDarkText = {
   multiValueLabel: (base) => ({ ...base, color: "#111827", fontWeight: 500 }),
 };
 
-/* ================= COMPACT SELECT — fixed short height, single-line text =================
-   Used for single-value dropdowns (Make, Model) where the placeholder/value should stay on
-   one line instead of wrapping and stretching the field taller than the inputs beside it. */
+
 const selectCompactText = {
   ...selectDarkText,
   control: (base) => ({ ...base, minHeight: 31, height: 31, borderColor: "#CBD5E1" }),
@@ -278,11 +259,7 @@ const selectCompactText = {
   }),
 };
 
-/* ================= TOP STATS CARD — Pending / In Process / Delivered / Revenue =================
-   Small dashboard-style cards shown above the Job Sheet Info Bar (same idea as an admin
-   summary strip). Counts come from ALL job sheets (via /api/jobsheets/filter), not just the
-   one currently open on this page — so opening/editing a single Job Sheet still shows the
-   shop-wide totals. Cancelled job sheets are excluded from every count. */
+
 const statCardWrap = {
   borderRadius: 10, padding: "8px 10px", display: "flex",
   flexDirection: "row", alignItems: "center", gap: 8, height: "100%",
@@ -293,6 +270,7 @@ const StatCard = ({ label, value, icon, bg }) => (
     <div className="card shadow-sm" style={statCardWrap}>
       <div style={{
         width: 30, height: 30, borderRadius: "50%", background: bg,
+        
         display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0
       }}>
         {icon}
@@ -313,16 +291,7 @@ const JobSheetPage = ({ editData = null, isEdit = false }) => {
   const [saving, setSaving] = useState(false);
   const [updating, setUpdating] = useState(false);
   const [rebilling, setRebilling] = useState(false);
-  // ================= DUPLICATE-SUBMIT GUARD REFS (NEW) =================
-  // 🔴 WHY REFS AND NOT JUST STATE: setSaving/setUpdating are async — React doesn't
-  // repaint "disabled" onto the button instantly. If the user (or a slow network /
-  // accidental second tap) fires the click handler twice within that same tick, BOTH
-  // calls still read the OLD state ("not saving/updating yet") and both go through —
-  // two parallel PUT/POST requests hit the backend at the same time. This is exactly
-  // what caused JS-598's revenueEntries to end up with duplicate rows for the same
-  // day: two Update calls racing each other. A ref updates synchronously the instant
-  // we set it, so the very next line of code (even before React re-renders) already
-  // sees the new value — the second click is blocked for real.
+ 
   const savingRef = React.useRef(false);
   const updatingRef = React.useRef(false);
   const originalStatusRef = React.useRef("");
@@ -334,9 +303,7 @@ const JobSheetPage = ({ editData = null, isEdit = false }) => {
   const [cancelRemarksInput, setCancelRemarksInput] = useState("");
   const [cancelling, setCancelling] = useState(false);
 
-  /* ================= TOAST NOTIFICATIONS =================
-     Replaces every window.alert(...) in this file. Call showToast("message", "success" |
-     "error" | "warning" | "info"). Auto-dismisses after 4s; click a toast to dismiss early. */
+  
   const [toasts, setToasts] = useState([]);
   const showToast = (message, type = "info") => {
     const id = Date.now() + Math.random();
@@ -1232,9 +1199,10 @@ formData.append("device", JSON.stringify({ make: make === "__custom" ? customMak
       showToast("Job Sheet Updated", "success");
       fetchJobStats(); // status/income maarina odane top stats refresh aagum
 
+  
     } catch (err) {
       console.error(err);
-      showToast("Update failed", "error");
+      showToast(err.response?.data?.error || err.response?.data?.message || "Update failed", "error");
     }
     } finally {
       // ✅ always release the guard, whether Update succeeded, failed validation,
@@ -1323,18 +1291,20 @@ formData.append("device", JSON.stringify({ make: make === "__custom" ? customMak
       formData.append("createdBy", JSON.stringify({ username: user.username, role: user.role }));
 
       const res = await axios.post(`${API}/api/jobsheets`, formData, {
-        headers: { "Content-Type": "multipart/form-data" }
+         headers: { "Content-Type": "multipart/form-data" }
       });
 
-      showToast("Job Sheet Saved", "success");
+      // ✅ the server allocates the real number (atomic per-store counter) — show it
+      showToast(`Job Sheet Saved: ${res.data?.job?.jobSheetNo || ""}`, "success");
       fetchJobStats(); // puthu job sheet — top stats refresh aagum
 
       const next = await axios.get(`${API}/api/jobsheets/next-number`);
       handleNew(next.data.next);
 
+   
     } catch (err) {
       console.error(err);
-      showToast("Save failed", "error");
+      showToast(err.response?.data?.message || "Save failed", "error");
     } finally {
       setSaving(false);
       savingRef.current = false;
@@ -1520,28 +1490,18 @@ originalStatusRef.current = editData.device?.mobileStatus || "";
     try {
       const trimmed = searchText.trim();
 
-      const isJobSheetNo =
-        /^JS-\d+$/i.test(trimmed) ||
-        (/^\d{1,4}$/.test(trimmed) && trimmed.length <= 4);
-
       const res = await axios.get(`${API}/api/jobsheets/filter`, {
         params: {
           q: trimmed || undefined,
           status: searchStatus || undefined,
           fromDate: fromDate || undefined,
           toDate: toDate || undefined,
-        },
+               },
       });
 
-      let filtered = res.data;
-
-      if (trimmed && isJobSheetNo && /^\d+$/.test(trimmed)) {
-        const padded = trimmed.padStart(3, "0");
-        const exact = `JS-${padded}`;
-        filtered = res.data.filter((js) => js.jobSheetNo === exact);
-      }
-
-      setResults(filtered);
+      // ✅ MULTI-STORE — job-number matching (234 → JS-234 / CBE-JS-234, full numbers with any
+      // store prefix) is now done by the backend /filter route, so no client-side "JS-" filter here.
+      setResults(res.data);
       setShowSearchModal(true);
     } catch (err) {
       console.error(err);

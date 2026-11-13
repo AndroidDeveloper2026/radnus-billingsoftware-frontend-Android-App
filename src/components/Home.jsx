@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import axios from "axios";   // ✅ was fetch() — fetch bypassed the token/store interceptor
 import { BarChart2, Clock, CheckCircle, Zap } from "lucide-react";
 import JobSheetSidebar from "./JobSheetSidebar";
 
@@ -22,9 +23,8 @@ const Home = () => {
   const [stats, setStats] = useState({ totalJobs: 0, pendingJobs: 0, completedJobs: 0 });
 
   useEffect(() => {
-    fetch(`${API}/api/dashboard/stats`)
-      .then(res => res.json())
-      .then(data => setStats(data))
+    axios.get(`${API}/api/dashboard/stats`)
+      .then(res => setStats(res.data))
       .catch(err => console.log(err));
   }, []);
 

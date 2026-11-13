@@ -34,28 +34,31 @@ import IncomeReportPage from "./components/reports/IncomeReportPage";
 import EngineerDashboard from "./components/Engineerdashboard"
 import RebillReportPage from "./components/reports/RebillReportPage";
 import AskRadnusAI from "./components/AskRadnusAI";   // ✅ NEW — Add 1
+import RequireAuth from "./components/RequireAuth";       // ✅ route guard
+import StoreSwitcher from "./components/StoreSwitcher";   // ✅ multi-store switcher (floating pill)
 import './App.css';
 
 function App() {
   return (
     <BrowserRouter>
+      <StoreSwitcher />
       <Routes>
         <Route path="/" element={<Firstpage />} />
-        <Route path="/home" element={<Home />} />
+        <Route path="/home" element={<RequireAuth><Home /></RequireAuth>} />
 
         {/* ✅ Dynamic engineer route - /engineer/ajith, /engineer/barani */}
-        <Route path="/engineer/:name" element={<EngineerDashboard />} />
+        <Route path="/engineer/:name" element={<RequireAuth><EngineerDashboard /></RequireAuth>} />
 
-        <Route path="/jobsheet" element={<Navigate to="/jobsheet/new" replace />} />
-        <Route path="/jobsheet/new" element={<JobSheetPage isEdit={false} editData={null} />} />
-        <Route path="/jobsheet/:id" element={<JobSheetEditWrapper />} />
+        <Route path="/jobsheet" element={<RequireAuth><Navigate to="/jobsheet/new" replace /></RequireAuth>} />
+        <Route path="/jobsheet/new" element={<RequireAuth><JobSheetPage isEdit={false} editData={null} /></RequireAuth>} />
+        <Route path="/jobsheet/:id" element={<RequireAuth><JobSheetEditWrapper /></RequireAuth>} />
 
-        <Route path="/estimate-bill/:id" element={<EstimateBill />} />
-        <Route path="/invoice/:id" element={<InvoiceBill />} />
-        <Route path="/report" element={<ReportPage />} />
+        <Route path="/estimate-bill/:id" element={<RequireAuth><EstimateBill /></RequireAuth>} />
+        <Route path="/invoice/:id" element={<RequireAuth><InvoiceBill /></RequireAuth>} />
+        <Route path="/report" element={<RequireAuth><ReportPage /></RequireAuth>} />
                <Route path="/pending-report"  element={<RepairPendingReport />} />
-        <Route path="/repaired-report" element={<RepairedReport />} />
-        <Route path="/delivered-report" element={<DeliveryReport />} />
+        <Route path="/repaired-report" element={<RequireAuth><RepairedReport /></RequireAuth>} />
+        <Route path="/delivered-report" element={<RequireAuth><DeliveryReport /></RequireAuth>} />
 
 
 
@@ -63,32 +66,32 @@ function App() {
 
         
       
-        <Route path="/value-report" element={<ValueReport />} />
-        <Route path="/engineer-report" element={<EngineerValueReport />} />
-        <Route path="/received-report" element={<DailyReceivedReport />} />
+        <Route path="/value-report" element={<RequireAuth><ValueReport /></RequireAuth>} />
+        <Route path="/engineer-report" element={<RequireAuth><EngineerValueReport /></RequireAuth>} />
+        <Route path="/received-report" element={<RequireAuth><DailyReceivedReport /></RequireAuth>} />
      
       <Route path="/daily-pending-report"   element={<DailyPendingReport />} />
 <Route path="/daily-repaired-report"  element={<DailyRepairedReport />} />
-<Route path="/daily-delivered-report" element={<DailyDeliveredOKReport />} />
-        <Route path="/delivered-nrna-report" element={<DailyDeliveredNRNAReport />} />
-        <Route path="/all-report" element={<AllReportPage />} />
-        <Route path="/engineer-all-report" element={<EngineerReportPage />} />
-        <Route path="/dealer-report" element={<DealerReportPage />} />
+<Route path="/daily-delivered-report" element={<RequireAuth><DailyDeliveredOKReport /></RequireAuth>} />
+        <Route path="/delivered-nrna-report" element={<RequireAuth><DailyDeliveredNRNAReport /></RequireAuth>} />
+        <Route path="/all-report" element={<RequireAuth><AllReportPage /></RequireAuth>} />
+        <Route path="/engineer-all-report" element={<RequireAuth><EngineerReportPage /></RequireAuth>} />
+        <Route path="/dealer-report" element={<RequireAuth><DealerReportPage /></RequireAuth>} />
 
 
-<Route path="/salesrep-report" element={<ServiceRepReportPage />} />
-<Route path="/service-report" element={<ServiceReportPage />} />
-<Route path="/income-report" element={<IncomeReportPage />} />
-<Route path="/others-report" element={<OthersReportPage />} />
-<Route path="/advance-report" element={<AdvanceReportPage />} />
+<Route path="/salesrep-report" element={<RequireAuth><ServiceRepReportPage /></RequireAuth>} />
+<Route path="/service-report" element={<RequireAuth><ServiceReportPage /></RequireAuth>} />
+<Route path="/income-report" element={<RequireAuth><IncomeReportPage /></RequireAuth>} />
+<Route path="/others-report" element={<RequireAuth><OthersReportPage /></RequireAuth>} />
+<Route path="/advance-report" element={<RequireAuth><AdvanceReportPage /></RequireAuth>} />
 
-<Route path="/my-report" element={<ServiceRepReportPage />} />
+<Route path="/my-report" element={<RequireAuth><ServiceRepReportPage /></RequireAuth>} />
      
-        <Route path="/rebill-report" element={<RebillReportPage />} />
-        <Route path="/ask-ai" element={<AskRadnusAI />} />   {/* ✅ NEW — Add 2 */}
-        <Route path="/user-list" element={<UserListPopup />} />
-        <Route path="/spare-report" element={<SpareReportPage />} />
-        <Route path="/spare-return-report" element={<SpareReturnReportPage />} />   {/* 👈 NEW */}
+        <Route path="/rebill-report" element={<RequireAuth><RebillReportPage /></RequireAuth>} />
+        <Route path="/ask-ai" element={<RequireAuth roles={["admin"]}><AskRadnusAI /></RequireAuth>} />   {/* ✅ NEW — Add 2 */}
+        <Route path="/user-list" element={<RequireAuth roles={["admin", "storeManager"]}><UserListPopup /></RequireAuth>} />
+        <Route path="/spare-report" element={<RequireAuth><SpareReportPage /></RequireAuth>} />
+        <Route path="/spare-return-report" element={<RequireAuth><SpareReturnReportPage /></RequireAuth>} />   {/* 👈 NEW */}
       
       </Routes>
     </BrowserRouter>
