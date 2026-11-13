@@ -36,27 +36,14 @@ const LoginModal = ({ show, onClose }) => {
         return;
       }
 
-   
       sessionStorage.setItem("token", data.token);
       sessionStorage.setItem("user", JSON.stringify(data.user));
-
-      // ✅ MULTI-STORE — which store the app is "looking at":
-      //    admin → starts in the original store (can switch / pick "All stores" via the pill)
-      //    gm    → starts in "All stores"
-      //    others → locked to their own store by the backend, nothing to remember
-      if (data.user.role === "admin") sessionStorage.setItem("activeStoreId", data.user.defaultStoreId || "all");
-      else if (data.user.role === "gm") sessionStorage.setItem("activeStoreId", "all");
-      else sessionStorage.removeItem("activeStoreId");
-
       onClose();
 
       // ✅ Engineer → /engineer/ajith (name lowercase)
       if (data.user.role === "engineer") {
         const engineerPath = (data.user.name || data.user.username).toLowerCase();
         navigate(`/engineer/${engineerPath}`);
-      } else if (data.user.role === "gm") {
-        // GM is oversight-only → land on the reports
-        navigate("/report");
       } else {
         // ✅ Admin/other roles → direct Job Sheet page (Home illa)
         navigate("/jobsheet");

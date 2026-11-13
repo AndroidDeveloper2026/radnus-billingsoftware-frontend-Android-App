@@ -3,23 +3,15 @@ import axios from "axios";
 
 const UserAddition = ({ onClose }) => {
   const [activeTab, setActiveTab] = useState("user"); // "user" | "salesrep"
-    const API = import.meta.env.VITE_API_URL;
+  const API = import.meta.env.VITE_API_URL;
 
   // ── USER FORM ──
-  // ✅ MULTI-STORE — who is adding the user decides which roles / stores are offered
-  const me = (() => { try { return JSON.parse(sessionStorage.getItem("user") || "{}"); } catch { return {}; } })();
-  const isAdmin = me?.role === "admin";            // Super Admin: any role, any store
-  const activeStore = sessionStorage.getItem("activeStoreId");
-  const [stores, setStores] = useState([]);
-
   const [form, setForm] = useState({
     name: "",
     username: "",
     password: "",
-    role: "user",
-    storeId: activeStore && activeStore !== "all" ? activeStore : ""
+    role: "user"
   });
-  const needsStore = !["admin", "gm"].includes(form.role);
   const [loading, setLoading] = useState(false);
 
   // ── SALES REP ──
@@ -27,16 +19,9 @@ const UserAddition = ({ onClose }) => {
   const [newName, setNewName]   = useState("");
   const [repLoading, setRepLoading] = useState(false);
 
-   useEffect(() => {
+  useEffect(() => {
     window.getSelection()?.removeAllRanges();
     fetchReps();
-    if (isAdmin) {
-      axios.get(`${API}/api/stores`).then(res => {
-        setStores(res.data || []);
-        // default the store dropdown if nothing was pre-selected
-        setForm(f => (f.storeId || !res.data?.length) ? f : { ...f, storeId: res.data[0]._id });
-      }).catch(() => {});
-    }
   }, []);
 
   const fetchReps = () =>
@@ -47,21 +32,17 @@ const UserAddition = ({ onClose }) => {
   // ── HANDLERS: USER ──
   const handleSubmit = async () => {
     if (!form.name.trim() || !form.username.trim() || !form.password.trim()) {
-           alert("All fields required");
-      return;
-    }
-    if (isAdmin && needsStore && !form.storeId) {
-      alert("Select a store for this user");
+      alert("All fields required");
       return;
     }
     try {
       setLoading(true);
       await axios.post(`${API}/api/users`, form);
       alert("User created ✅");
-      setForm({ name: "", username: "", password: "", role: "user", storeId: form.storeId });
+      setForm({ name: "", username: "", password: "", role: "user" });
       onClose();
     } catch (err) {
-      alert(err.response?.data?.message || "Error ❌");
+      alert("Error ❌");
     } finally {
       setLoading(false);
     }
@@ -89,11 +70,9 @@ const UserAddition = ({ onClose }) => {
   };
 
   const roleColors = {
-      user:     { bg: "#eff6ff", border: "#3b82f6", text: "#1d4ed8", label: "👤 User (Reception)" },
+    user:     { bg: "#eff6ff", border: "#3b82f6", text: "#1d4ed8", label: "👤 User (Reception)" },
     engineer: { bg: "#f0fdf4", border: "#22c55e", text: "#15803d", label: "🔧 Engineer" },
     admin:    { bg: "#fef3c7", border: "#f59e0b", text: "#b45309", label: "⚙️ Admin" },
-    storeManager: { bg: "#f5f3ff", border: "#8b5cf6", text: "#6d28d9", label: "🏬 Store Manager (own store only)" },
-    gm:       { bg: "#fff1f2", border: "#f43f5e", text: "#be123c", label: "📊 GM (all stores, view-only)" },
   };
 
   return (
@@ -185,10 +164,7 @@ const UserAddition = ({ onClose }) => {
                 >
                   <option value="user">👤 User (Reception)</option>
                   <option value="engineer">🔧 Engineer</option>
-                  {/* only Super Admin can create these (backend enforces it too) */}
-                  {isAdmin && <option value="storeManager">🏬 Store Manager</option>}
-                  {isAdmin && <option value="gm">📊 GM</option>}
-                  {isAdmin && <option value="admin">⚙️ Admin</option>}
+                  <option value="admin">⚙️ Admin</option>
                 </select>
                 <div
                   className="mt-2 px-3 py-1 rounded-full text-xs font-semibold inline-block"
@@ -198,24 +174,9 @@ const UserAddition = ({ onClose }) => {
                     color: roleColors[form.role]?.text,
                   }}
                 >
-                                 {roleColors[form.role]?.label}
+                  {roleColors[form.role]?.label}
                 </div>
               </div>
-
-              {/* Store — Super Admin picks it; a Store Manager's users always go to their own store */}
-              {isAdmin && needsStore && (
-                <div>
-                  <label className="text-sm text-gray-700 font-medium">Store</label>
-                  <select
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 mt-1 focus:ring-2 focus:ring-blue-500 outline-none bg-white text-black"
-                    value={form.storeId}
-                    onChange={e => setForm({ ...form, storeId: e.target.value })}
-                  >
-                    <option value="">Select store</option>
-                    {stores.map(s => <option key={s._id} value={s._id}>{s.name}</option>)}
-                  </select>
-                </div>
-              )}
 
               <button
                 onClick={handleSubmit}

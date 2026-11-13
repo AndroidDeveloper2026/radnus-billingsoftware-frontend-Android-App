@@ -96,10 +96,10 @@ const ReportPage = () => {
                 <button key={i} onClick={() => navigate(b.path)} className="rpt-btn">{b.label}</button>
               ))}
             </div>
-               </div>
+          </div>
 
           {/* Daily Summary — admin மட்டும் */}
-          {["admin", "storeManager", "gm"].includes(role) && (
+          {role === "admin" && (
             <div style={{ background: "#fff", borderRadius: "14px", padding: "20px", boxShadow: "0 1px 4px rgba(0,0,0,0.06)" }}>
               <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "14px" }}>
                 <CalendarDays size={18} color="#6366f1" />
@@ -126,10 +126,10 @@ const ReportPage = () => {
                 ))}
               </div>
             </div>
-                  )}
+          )}
 
           {/* Reports — user மட்டும் */}
-          {!["admin", "storeManager", "gm"].includes(role) && (
+          {role !== "admin" && (
             <div style={{ background: "#fff", borderRadius: "14px", padding: "20px", boxShadow: "0 1px 4px rgba(0,0,0,0.06)" }}>
               <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "14px" }}>
                 <FolderOpen size={18} color="#6366f1" />
