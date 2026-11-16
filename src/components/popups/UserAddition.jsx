@@ -10,13 +10,15 @@ const UserAddition = ({ onClose }) => {
     name: "",
     username: "",
     password: "",
-    role: "user"
+    role: "user",
+    feedbackAccess: "none",   // ✅ NEW
+    linkedRep: ""
   });
   const [loading, setLoading] = useState(false);
 
   // ── SALES REP ──
-  const [repList, setRepList]   = useState([]);
-  const [newName, setNewName]   = useState("");
+  const [repList, setRepList] = useState([]);
+  const [newName, setNewName] = useState("");
   const [repLoading, setRepLoading] = useState(false);
 
   useEffect(() => {
@@ -27,7 +29,7 @@ const UserAddition = ({ onClose }) => {
   const fetchReps = () =>
     axios.get(`${API}/api/salesreps`)
       .then(res => setRepList(res.data))
-      .catch(() => {});
+      .catch(() => { });
 
   // ── HANDLERS: USER ──
   const handleSubmit = async () => {
@@ -39,10 +41,10 @@ const UserAddition = ({ onClose }) => {
       setLoading(true);
       await axios.post(`${API}/api/users`, form);
       alert("User created ✅");
-      setForm({ name: "", username: "", password: "", role: "user" });
+      setForm({ name: "", username: "", password: "", role: "user", feedbackAccess: "none", linkedRep: "" });
       onClose();
     } catch (err) {
-      alert("Error ❌");
+      alert(err.response?.data?.message || "Error ❌");
     } finally {
       setLoading(false);
     }
@@ -70,9 +72,9 @@ const UserAddition = ({ onClose }) => {
   };
 
   const roleColors = {
-    user:     { bg: "#eff6ff", border: "#3b82f6", text: "#1d4ed8", label: "👤 User (Reception)" },
+    user: { bg: "#eff6ff", border: "#3b82f6", text: "#1d4ed8", label: "👤 User (Reception)" },
     engineer: { bg: "#f0fdf4", border: "#22c55e", text: "#15803d", label: "🔧 Engineer" },
-    admin:    { bg: "#fef3c7", border: "#f59e0b", text: "#b45309", label: "⚙️ Admin" },
+    admin: { bg: "#fef3c7", border: "#f59e0b", text: "#b45309", label: "⚙️ Admin" },
   };
 
   return (
@@ -100,7 +102,7 @@ const UserAddition = ({ onClose }) => {
           {/* TAB TOGGLE */}
           <div className="flex bg-gray-100 rounded-xl p-1 mb-5 gap-1">
             {[
-              { key: "user",    label: "👤 Add User"    },
+              { key: "user", label: "👤 Add User" },
               { key: "salesrep", label: "🧑‍💼 Service Reps" },
             ].map(tab => (
               <button
@@ -109,8 +111,8 @@ const UserAddition = ({ onClose }) => {
                 className="flex-1 py-2 rounded-lg text-sm font-semibold transition-all"
                 style={{
                   background: activeTab === tab.key ? "#fff" : "transparent",
-                  color:      activeTab === tab.key ? "#1d4ed8" : "#6b7280",
-                  boxShadow:  activeTab === tab.key ? "0 1px 4px rgba(0,0,0,0.1)" : "none",
+                  color: activeTab === tab.key ? "#1d4ed8" : "#6b7280",
+                  boxShadow: activeTab === tab.key ? "0 1px 4px rgba(0,0,0,0.1)" : "none",
                 }}
               >
                 {tab.label}
@@ -129,7 +131,13 @@ const UserAddition = ({ onClose }) => {
                   placeholder="Enter full name"
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 mt-1 focus:ring-2 focus:ring-blue-500 outline-none bg-white text-black"
                   value={form.name}
-                  onChange={e => setForm({ ...form, name: e.target.value })}
+                  onChange={e => {
+                    const v = e.target.value;
+                    const match = repList.find(
+                      r => r.name.trim().toLowerCase() === v.trim().toLowerCase()
+                    );
+                    setForm({ ...form, name: v, linkedRep: match ? match.name : form.linkedRep });
+                  }}
                 />
               </div>
 
@@ -177,6 +185,37 @@ const UserAddition = ({ onClose }) => {
                   {roleColors[form.role]?.label}
                 </div>
               </div>
+
+              {form.role === "user" && (
+                <>
+                  <div>
+                    <label className="text-sm text-gray-700 font-medium">Linked Service Rep</label>
+                    <select
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 mt-1 focus:ring-2 focus:ring-blue-500 outline-none bg-white text-black"
+                      value={form.linkedRep}
+                      onChange={e => setForm({ ...form, linkedRep: e.target.value })}
+                    >
+                      <option value="">— Not a service rep —</option>
+                      {repList.map(r => (
+                        <option key={r._id} value={r.name}>{r.name}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="text-sm text-gray-700 font-medium">Feedback Access</label>
+                    <select
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 mt-1 focus:ring-2 focus:ring-blue-500 outline-none bg-white text-black"
+                      value={form.feedbackAccess}
+                      onChange={e => setForm({ ...form, feedbackAccess: e.target.value })}
+                    >
+                      <option value="none">None</option>
+                      <option value="with_billing">Feedback + Billing work</option>
+                      <option value="only">Feedback only</option>
+                    </select>
+                  </div>
+                </>
+              )}
 
               <button
                 onClick={handleSubmit}

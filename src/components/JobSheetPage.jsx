@@ -10,6 +10,7 @@ import RepairStepsTimeline from "./RepairStepsTimeline";
 import CustomerAutocomplete from "./CustomerAutocomplete";
 import JobSheetSidebar from "./JobSheetSidebar";
 import { useNavigate } from "react-router-dom";
+import useCaseBadge from "../hooks/useCaseBadge";
 import {
   FileText, Save, RefreshCw, Calculator, Receipt, Home, Plus, Ban,
   Menu, Bell, Bandage, Gift, User, Smartphone, Wrench, Eye,
@@ -309,20 +310,11 @@ const JobSheetPage = ({ editData = null, isEdit = false }) => {
   const [makeList, setMakeList] = useState([]);
   const [modelList, setModelList] = useState([]);
   const navigate = useNavigate();
+    const caseCount = useCaseBadge();
   const [jobSheetNo, setJobSheetNo] = useState("");
   const [saving, setSaving] = useState(false);
   const [updating, setUpdating] = useState(false);
   const [rebilling, setRebilling] = useState(false);
-  // ================= DUPLICATE-SUBMIT GUARD REFS (NEW) =================
-  // 🔴 WHY REFS AND NOT JUST STATE: setSaving/setUpdating are async — React doesn't
-  // repaint "disabled" onto the button instantly. If the user (or a slow network /
-  // accidental second tap) fires the click handler twice within that same tick, BOTH
-  // calls still read the OLD state ("not saving/updating yet") and both go through —
-  // two parallel PUT/POST requests hit the backend at the same time. This is exactly
-  // what caused JS-598's revenueEntries to end up with duplicate rows for the same
-  // day: two Update calls racing each other. A ref updates synchronously the instant
-  // we set it, so the very next line of code (even before React re-renders) already
-  // sees the new value — the second click is blocked for real.
   const savingRef = React.useRef(false);
   const updatingRef = React.useRef(false);
   const originalStatusRef = React.useRef("");
@@ -1703,12 +1695,18 @@ originalStatusRef.current = editData.device?.mobileStatus || "";
           <span style={{ fontWeight: 700, fontSize: 16 }}>Job Sheet</span>
         </div>
           <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-            <span style={{ position: "relative", display: "inline-flex" }}>
+                        <span
+              onClick={() => navigate("/cases")}
+              title="Cases"
+              style={{ position: "relative", display: "inline-flex", cursor: "pointer" }}
+            >
               <Bell size={18} style={{ opacity: 0.95 }} />
-              <span style={{
-                position: "absolute", top: -6, right: -8, background: "#fff", color: RED_TEXT,
-                borderRadius: "50%", fontSize: 9, fontWeight: 800, padding: "1px 5px"
-              }}>3</span>
+              {caseCount > 0 && (
+                <span style={{
+                  position: "absolute", top: -6, right: -8, background: "#fff", color: RED_TEXT,
+                  borderRadius: "50%", fontSize: 9, fontWeight: 800, padding: "1px 5px"
+                }}>{caseCount}</span>
+              )}
             </span>
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <div style={{
