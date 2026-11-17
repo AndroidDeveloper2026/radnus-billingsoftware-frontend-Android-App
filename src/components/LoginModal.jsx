@@ -6,8 +6,8 @@ const LoginModal = ({ show, onClose }) => {
 
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError]       = useState("");
-  const [loading, setLoading]   = useState(false);
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
   const API = import.meta.env.VITE_API_URL;
 
   if (!show) return null;
@@ -40,12 +40,14 @@ const LoginModal = ({ show, onClose }) => {
       sessionStorage.setItem("user", JSON.stringify(data.user));
       onClose();
 
-            // ✅ Engineer → /engineer/ajith
+      // ✅ Engineer → /engineer/ajith
       if (data.user.role === "engineer") {
         const engineerPath = (data.user.name || data.user.username).toLowerCase();
         navigate(`/engineer/${engineerPath}`);
       } else if (data.user.role === "user" && data.user.feedbackAccess === "only") {
         navigate("/feedback");          // ✅ NEW — Feedback only user
+      } else if (data.user.role === "admin") {
+        navigate("/analytics");          // ✅ NEW — Admin → Analytics first
       } else {
         navigate("/jobsheet");
       }

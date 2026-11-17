@@ -40,7 +40,7 @@ const ATTEMPT_OPTIONS = [
 const ATTEMPT_LABEL = Object.fromEntries(ATTEMPT_OPTIONS.map((o) => [o.key, o.label]));
 
 const fmt = (d) => (d ? new Date(d).toLocaleDateString("en-GB") : "-");
-const fmtDT = (d) => (d ? new Date(d).toLocaleString("en-GB") : "-");
+const fmtDT = (d) => (d ? new Date(d).toLocaleString("en-GB", { hour12: true }) : "-");   // ✅ 12-hour (4:58:37 pm)
 const sameStr = (a, b) =>
   String(a ?? "").trim().toLowerCase() === String(b ?? "").trim().toLowerCase();
 
@@ -237,11 +237,25 @@ const FEEDBACK_CSS = `
 
 /* ===== responsive ===== */
 @media (max-width: 991.98px) {
-  .fb-overlay { padding: 0; }
-  .fb-modal   { border-radius: 0 !important; min-height: 100vh; }
+  /* bottom padding keeps the last content clear of the mobile browser bar / home indicator */
+  .fb-overlay { padding: 0 0 calc(90px + env(safe-area-inset-bottom, 0px)); -webkit-overflow-scrolling: touch; }
+  /* overflow must be visible, otherwise position:sticky inside the modal never sticks */
+  .fb-modal   { border-radius: 0 !important; min-height: 100vh; min-height: 100dvh; overflow: visible; }
   .fb-pane    { max-height: none; overflow: visible; }
   .fb-left    { border-right: 0 !important; border-top: 1px solid #e2e8f0; }
-  .fb-head    { position: sticky; top: 0; z-index: 5; background: #fff; }
+  .fb-head    { position: static; background: #fff; }
+  /* job sheet strip stays pinned at the top while the form scrolls */
+  .fb-strip-wrap { position: sticky; top: 0; z-index: 6; padding-top: 10px; padding-bottom: 8px; box-shadow: 0 4px 10px rgba(15,23,42,.08); }
+  .fb-strip-wrap .fb-strip-top { margin-bottom: 8px; }
+  .fb-strip-wrap .fb-progress  { margin-bottom: 8px; }
+  /* all job sheet pills visible: wrap into a grid (3 per row on phones) instead of a sideways scroll.
+     Sticky height is capped at 2 rows; with more job sheets the grid scrolls vertically. */
+  .fb-strip-wrap .fb-strip { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 8px; overflow-x: visible; overflow-y: auto; max-height: 120px; padding-bottom: 2px; }
+  .fb-strip-wrap .fb-pill  { min-width: 0; padding: 6px 10px; }
+  /* legend kept (same as desktop) but squeezed into one swipeable line */
+  .fb-strip-wrap .fb-legend    { flex-wrap: nowrap; overflow-x: auto; white-space: nowrap; gap: 6px 14px; margin-top: 2px; padding-bottom: 2px; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+  .fb-strip-wrap .fb-legend::-webkit-scrollbar { display: none; }
+  .fb-strip-wrap .fb-legend > * { flex: 0 0 auto; }
 }
 
 @media (max-width: 575.98px) {
@@ -1100,11 +1114,9 @@ const FeedbackPage = () => {
                 className={`fbp-tab ${tab === t.key ? "on" : ""}`}
                 onClick={() => setTab(t.key)}>
                 {t.label}
-                {t.key !== "done" && (
-                  <span className="fbp-count">
-                    {t.key === "attempts" ? attemptList.length : (queue.counts?.[t.key] ?? 0)}
-                  </span>
-                )}
+                <span className="fbp-count">
+                  {t.key === "attempts" ? attemptList.length : (queue.counts?.[t.key] ?? 0)}
+                </span>
               </button>
             ))}
           </div>

@@ -38,6 +38,7 @@ import FeedbackPage from "./components/FeedbackPage";
 import RequireRole from "./components/RequireRole";
 import FeedbackReportPage from "./components/FeedbackReportPage";
 import CasesPage from "./components/CasesPage";
+import AnalyticsPage from "./components/AnalyticsPage"; 
 import './App.css';
 
 function App() {
@@ -86,7 +87,8 @@ function App() {
         <Route path="/ask-ai" element={<AskRadnusAI />} />   {/* ✅ NEW — Add 2 */}
         <Route path="/feedback" element={<RequireRole feedback><FeedbackPage /></RequireRole>} />
         <Route path="/feedback-report" element={<RequireRole adminOnly><FeedbackReportPage /></RequireRole>} />
-                <Route path="/cases" element={<RequireRole cases><CasesPage /></RequireRole>} />
+        <Route path="/cases" element={<RequireRole cases><CasesPage /></RequireRole>} />
+        <Route path="/analytics" element={<RequireRole adminOnly><AnalyticsPage /></RequireRole>} />   {/* ✅ NEW */}
         <Route path="/user-list" element={<UserListPopup />} />
         <Route path="/spare-report" element={<SpareReportPage />} />
         <Route path="/spare-return-report" element={<SpareReturnReportPage />} />   {/* 👈 NEW */}
