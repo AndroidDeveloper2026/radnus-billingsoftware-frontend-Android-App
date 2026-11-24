@@ -21,7 +21,7 @@ import DailyDeliveredOKReport from "./components/reports/DailyDeliveredOKReport"
 import DailyDeliveredNRNAReport from "./components/reports/DailyDeliveredNRNAReport";
 import DailyRepairedReport from "./components/reports/DailyRepairedReport";
 import AllReportPage from "./components/reports/AllReportPage";
-import EngineerReportPage from "./components/reports/EngineerReportPage";
+import AllEngineerReportPage from "./components/reports/AllEngineerReportPage";
 import DealerReportPage from "./components/reports/DealerReportPage";
 import InvoiceBill from "./components/InvoiceBill";
 import UserReportPage from "./components/reports/UserReportPage";
@@ -38,7 +38,7 @@ import FeedbackPage from "./components/FeedbackPage";
 import RequireRole from "./components/RequireRole";
 import FeedbackReportPage from "./components/FeedbackReportPage";
 import CasesPage from "./components/CasesPage";
-import AnalyticsPage from "./components/AnalyticsPage"; 
+import AnalyticsPage from "./components/AnalyticsPage";
 import './App.css';
 
 function App() {
@@ -72,7 +72,7 @@ function App() {
         <Route path="/daily-delivered-report" element={<DailyDeliveredOKReport />} />
         <Route path="/delivered-nrna-report" element={<DailyDeliveredNRNAReport />} />
         <Route path="/all-report" element={<AllReportPage />} />
-        <Route path="/engineer-all-report" element={<EngineerReportPage />} />
+        <Route path="/engineer-all-report" element={<AllEngineerReportPage />} />
         <Route path="/dealer-report" element={<DealerReportPage />} />
 
         <Route path="/salesrep-report" element={<ServiceRepReportPage />} />

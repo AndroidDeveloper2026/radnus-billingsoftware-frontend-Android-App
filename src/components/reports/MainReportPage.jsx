@@ -12,10 +12,10 @@ const ReportPage = () => {
   const user = JSON.parse(sessionStorage.getItem("user"));
   const role = user?.role;
 
-  const [staleJobs, setStaleJobs]       = useState([]);
-  const [staleDays, setStaleDays]       = useState(3);
+  const [staleJobs, setStaleJobs] = useState([]);
+  const [staleDays, setStaleDays] = useState(3);
   const [staleLoading, setStaleLoading] = useState(false);
-  const [staleOpen, setStaleOpen]       = useState(true);
+  const [staleOpen, setStaleOpen] = useState(true);
 
   const fetchStale = async () => {
     setStaleLoading(true);
@@ -31,7 +31,7 @@ const ReportPage = () => {
   const urgencyColor = (d) => {
     if (d >= 7) return { dot: "#ef4444", bar: "#ef4444", badge: "#fee2e2", badgeText: "#991b1b" };
     if (d >= 3) return { dot: "#f59e0b", bar: "#f59e0b", badge: "#fef3c7", badgeText: "#92400e" };
-    return       { dot: "#3b82f6", bar: "#3b82f6", badge: "#dbeafe", badgeText: "#1e40af" };
+    return { dot: "#3b82f6", bar: "#3b82f6", badge: "#dbeafe", badgeText: "#1e40af" };
   };
 
   const maxDays = staleJobs.length > 0 ? staleJobs[0].staleDays : 1;
@@ -90,19 +90,19 @@ const ReportPage = () => {
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
               {[
-                { label: "Pending",         path: "/pending-report" },
-                { label: "Repaired",        path: "/repaired-report" },
-                { label: "Delivered",       path: "/delivered-report" },
-                { label: "Value Report",    path: "/value-report" },
+                { label: "Pending", path: "/pending-report" },
+                { label: "Repaired", path: "/repaired-report" },
+                { label: "Delivered", path: "/delivered-report" },
+                // { label: "Value Report", path: "/value-report" },
                 { label: "Engineer Report", path: "/engineer-report" },
-                { label: "Spare Report",    path: "/spare-report" },
+                { label: "Spare Report", path: "/spare-report" },
                 { label: "Spare Return Report", path: "/spare-return-report" },
-                { label: "Dealer Report",   path: "/dealer-report" },
-                { label: "Rebill Report",   path: "/rebill-report" },
-                { label: "Income Report",   path: "/income-report" },
-                { label: "Service Report (Margin)",  path: "/service-report" },
-                { label: "Others Report",   path: "/others-report" },
-                { label: "Advance Report",  path: "/advance-report" },
+                { label: "Dealer Report", path: "/dealer-report" },
+                { label: "Rebill Report", path: "/rebill-report" },
+                { label: "Income Report", path: "/income-report" },
+                { label: "Service Report (Margin)", path: "/service-report" },
+                { label: "Others Report", path: "/others-report" },
+                { label: "Advance Report", path: "/advance-report" },
               ].map((b, i) => (
                 <button key={i} onClick={() => navigate(b.path)} className="rpt-btn">{b.label}</button>
               ))}
@@ -118,19 +118,19 @@ const ReportPage = () => {
               </div>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
                 {[
-                  { label: "Received",        path: "/received-report" },
-                  { label: "Pending",         path: "/daily-pending-report" },
-                  { label: "Repaired",        path: "/daily-repaired-report" },
-                  { label: "Delivered",       path: "/daily-delivered-report" },
+                  { label: "Received", path: "/received-report" },
+                  { label: "Pending", path: "/daily-pending-report" },
+                  { label: "Repaired", path: "/daily-repaired-report" },
+                  { label: "Delivered", path: "/daily-delivered-report" },
                   { label: "Delivered NR/NA", path: "/delivered-nrna-report" },
-                  { label: "Service Rep Report",  path: "/salesrep-report" },
+                  { label: "Service Rep Report", path: "/salesrep-report" },
                 ].map((b, i) => (
                   <button key={i} onClick={() => navigate(b.path)} className="rpt-btn">{b.label}</button>
                 ))}
               </div>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", marginTop: "8px" }}>
                 {[
-                  { label: "All Report",          path: "/all-report" },
+                  { label: "All Report", path: "/all-report" },
                   { label: "All Engineer Report", path: "/engineer-all-report" },
                 ].map((b, i) => (
                   <button key={i} onClick={() => navigate(b.path)} className="rpt-btn-accent">{b.label}</button>
@@ -148,9 +148,10 @@ const ReportPage = () => {
               </div>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
                 {[
-                  { label: "All Report",          path: "/all-report" },
+                  { label: "All Report", path: "/all-report" },
                   { label: "All Engineer Report", path: "/engineer-all-report" },
-                  { label: "My Report",           path: "/my-report" },
+
+                  { label: "My Report", path: "/my-report" },
                 ].map((b, i) => (
                   <button key={i} onClick={() => navigate(b.path)} className="rpt-btn-accent">{b.label}</button>
                 ))}
@@ -219,7 +220,7 @@ const ReportPage = () => {
                 </div>
               ) : (
                 staleJobs.map(job => {
-                  const u   = urgencyColor(job.staleDays);
+                  const u = urgencyColor(job.staleDays);
                   const pct = Math.min((job.staleDays / maxDays) * 100, 100);
                   return (
                     <div key={job._id} className="stale-row" onClick={() => navigate(`/jobsheet/${job._id}`)}>
