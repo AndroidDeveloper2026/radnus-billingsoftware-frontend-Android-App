@@ -21,7 +21,7 @@ import DailyDeliveredOKReport from "./components/reports/DailyDeliveredOKReport"
 import DailyDeliveredNRNAReport from "./components/reports/DailyDeliveredNRNAReport";
 import DailyRepairedReport from "./components/reports/DailyRepairedReport";
 import AllReportPage from "./components/reports/AllReportPage";
-import EngineerReportPage from "./components/reports/EngineerReportPage";
+import AllEngineerReportPage from "./components/reports/AllEngineerReportPage";
 import DealerReportPage from "./components/reports/DealerReportPage";
 import InvoiceBill from "./components/InvoiceBill";
 import UserReportPage from "./components/reports/UserReportPage";
@@ -34,6 +34,11 @@ import IncomeReportPage from "./components/reports/IncomeReportPage";
 import EngineerDashboard from "./components/Engineerdashboard"
 import RebillReportPage from "./components/reports/RebillReportPage";
 import AskRadnusAI from "./components/AskRadnusAI";   // ✅ NEW — Add 1
+import FeedbackPage from "./components/FeedbackPage";
+import RequireRole from "./components/RequireRole";
+import FeedbackReportPage from "./components/FeedbackReportPage";
+import CasesPage from "./components/CasesPage";
+import AnalyticsPage from "./components/AnalyticsPage";
 import './App.css';
 
 function App() {
@@ -47,49 +52,47 @@ function App() {
         <Route path="/engineer/:name" element={<EngineerDashboard />} />
 
         <Route path="/jobsheet" element={<Navigate to="/jobsheet/new" replace />} />
-        <Route path="/jobsheet/new" element={<JobSheetPage isEdit={false} editData={null} />} />
-        <Route path="/jobsheet/:id" element={<JobSheetEditWrapper />} />
+        <Route path="/jobsheet/new" element={<RequireRole blockFeedbackOnly><JobSheetPage isEdit={false} editData={null} /></RequireRole>} />
+        <Route path="/jobsheet/:id" element={<RequireRole blockFeedbackOnly><JobSheetEditWrapper /></RequireRole>} />
 
         <Route path="/estimate-bill/:id" element={<EstimateBill />} />
         <Route path="/invoice/:id" element={<InvoiceBill />} />
-        <Route path="/report" element={<ReportPage />} />
-               <Route path="/pending-report"  element={<RepairPendingReport />} />
+        <Route path="/report" element={<RequireRole blockFeedbackOnly><ReportPage /></RequireRole>} />
+        <Route path="/pending-report" element={<RepairPendingReport />} />
         <Route path="/repaired-report" element={<RepairedReport />} />
         <Route path="/delivered-report" element={<DeliveryReport />} />
 
 
-
-
-
-        
-      
         <Route path="/value-report" element={<ValueReport />} />
         <Route path="/engineer-report" element={<EngineerValueReport />} />
         <Route path="/received-report" element={<DailyReceivedReport />} />
-     
-      <Route path="/daily-pending-report"   element={<DailyPendingReport />} />
-<Route path="/daily-repaired-report"  element={<DailyRepairedReport />} />
-<Route path="/daily-delivered-report" element={<DailyDeliveredOKReport />} />
+
+        <Route path="/daily-pending-report" element={<DailyPendingReport />} />
+        <Route path="/daily-repaired-report" element={<DailyRepairedReport />} />
+        <Route path="/daily-delivered-report" element={<DailyDeliveredOKReport />} />
         <Route path="/delivered-nrna-report" element={<DailyDeliveredNRNAReport />} />
         <Route path="/all-report" element={<AllReportPage />} />
-        <Route path="/engineer-all-report" element={<EngineerReportPage />} />
+        <Route path="/engineer-all-report" element={<AllEngineerReportPage />} />
         <Route path="/dealer-report" element={<DealerReportPage />} />
 
+        <Route path="/salesrep-report" element={<ServiceRepReportPage />} />
+        <Route path="/service-report" element={<ServiceReportPage />} />
+        <Route path="/income-report" element={<IncomeReportPage />} />
+        <Route path="/others-report" element={<OthersReportPage />} />
+        <Route path="/advance-report" element={<AdvanceReportPage />} />
 
-<Route path="/salesrep-report" element={<ServiceRepReportPage />} />
-<Route path="/service-report" element={<ServiceReportPage />} />
-<Route path="/income-report" element={<IncomeReportPage />} />
-<Route path="/others-report" element={<OthersReportPage />} />
-<Route path="/advance-report" element={<AdvanceReportPage />} />
+        <Route path="/my-report" element={<ServiceRepReportPage />} />
 
-<Route path="/my-report" element={<ServiceRepReportPage />} />
-     
         <Route path="/rebill-report" element={<RebillReportPage />} />
         <Route path="/ask-ai" element={<AskRadnusAI />} />   {/* ✅ NEW — Add 2 */}
+        <Route path="/feedback" element={<RequireRole feedback><FeedbackPage /></RequireRole>} />
+        <Route path="/feedback-report" element={<RequireRole adminOnly><FeedbackReportPage /></RequireRole>} />
+        <Route path="/cases" element={<RequireRole cases><CasesPage /></RequireRole>} />
+        <Route path="/analytics" element={<RequireRole adminOnly><AnalyticsPage /></RequireRole>} />   {/* ✅ NEW */}
         <Route path="/user-list" element={<UserListPopup />} />
         <Route path="/spare-report" element={<SpareReportPage />} />
         <Route path="/spare-return-report" element={<SpareReturnReportPage />} />   {/* 👈 NEW */}
-      
+
       </Routes>
     </BrowserRouter>
   );

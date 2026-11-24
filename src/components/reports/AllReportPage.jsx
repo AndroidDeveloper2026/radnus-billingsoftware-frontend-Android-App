@@ -29,6 +29,7 @@ const AllReportPage = () => {
     engineer: "",
     serviceRep: "",   // NEW
     dealer: "",
+    feedback: "",
     dateType: "created", // NEW — "created" | "transaction"
     fromDate: "",
     toDate: "",
@@ -46,7 +47,7 @@ const AllReportPage = () => {
   const loadData = async () => {
     setLoading(true);
     try {
-      const res = await axios.get(`${API}/api/jobsheets/filter`, { params: {} });
+      const res = await axios.get(`${API}/api/jobsheets/filter`, { params: { withFeedback: 1 } });
       setRawData(res.data || []);
     } catch (err) {
       console.error(err);
@@ -133,6 +134,13 @@ const AllReportPage = () => {
       if (applied.engineer && item.service?.engineer !== applied.engineer) return false;
       if (applied.serviceRep && item.service?.serviceRep !== applied.serviceRep) return false;
       if (dealerQ && !(item.service?.dealer || "").toLowerCase().includes(dealerQ)) return false;
+            if (applied.feedback) {
+        const r = item.feedbackRating;
+        if (applied.feedback === "rated" && !r) return false;
+        if (applied.feedback === "none" && r) return false;
+        if (applied.feedback === "low" && !(r && r <= 2)) return false;
+        if (/^[1-5]$/.test(applied.feedback) && r !== Number(applied.feedback)) return false;
+      }
       if (!dateMatches(item)) return false;
       return true;
     });
@@ -194,17 +202,17 @@ const AllReportPage = () => {
       : Number(item.service?.serviceCharge || 0);
   };
 
-const getBalanceTotal = (item) => Number(item.service?.balance || 0);
+  const getBalanceTotal = (item) => Number(item.service?.balance || 0);
 
 
-const getRawSpareTotal = (item) =>
-  (item.rawSpareItems || [])
-    .filter((ri) => !ri.isReturned)
-    .reduce((s, ri) => s + Number(ri.amount || 0), 0);
+  const getRawSpareTotal = (item) =>
+    (item.rawSpareItems || [])
+      .filter((ri) => !ri.isReturned)
+      .reduce((s, ri) => s + Number(ri.amount || 0), 0);
 
   const fmtDate = (d) => (d ? new Date(d).toLocaleDateString("en-IN") : "-");
-  const getBalanceDateStr  = (item) => fmtDate(item.service?.balanceDate);
-  const getOthersDateStr   = (item) => fmtDate(item.service?.othersDate);
+  const getBalanceDateStr = (item) => fmtDate(item.service?.balanceDate);
+  const getOthersDateStr = (item) => fmtDate(item.service?.othersDate);
 
   /* Latest transaction date for an items[] array (spareItems / rawSpareItems) —
      used as the single "Spare Date" / "Raw Spare Date" column value. When there's
@@ -231,7 +239,7 @@ const getRawSpareTotal = (item) =>
     return list.length > 1 ? list : [];
   };
 
-  const getIncomeBreakdown  = (item) => getBreakdown(item.service?.revenueEntries, "income");
+  const getIncomeBreakdown = (item) => getBreakdown(item.service?.revenueEntries, "income");
   const getServiceBreakdown = (item) => getBreakdown(item.service?.revenueEntries, "service");
   // spareItems / rawSpareItems aren't a "revenueEntries" ledger — they're the raw
   // parts lists, each with its own date/amount — so they need their own mapper.
@@ -288,57 +296,58 @@ const getRawSpareTotal = (item) =>
     if (filteredData.length === 0) { alert("No data to export ❌"); return; }
 
     const rows = filteredData.map((item, index) => ({
-      "SL No":              index + 1,
-      "Date":               new Date(item.createdAt).toLocaleDateString("en-IN"),
-      "Job Sheet No":       item.jobSheetNo || "-",
-      "Customer Name":      item.customer?.name || "-",
-      "Contact":            item.customer?.contact || "-",
-      "Alt Contact":        item.customer?.altContact || "-",
-      "Email":              item.customer?.email || "-",
-      "District":           item.customer?.district || "-",
-      "Taluk":              item.customer?.taluk || "-",
-      "Make":               item.device?.make || "-",
-      "Model":              item.device?.model || "-",
-      "IMEI":               imeiDisplayValue(item.device?.imei),
-      "Warranty":           item.device?.warranty || "-",
-      "Status":             item.device?.mobileStatus || "-",
-      "Engineer":           item.service?.engineer || "-",
-      "Service Rep":        item.service?.serviceRep || "-",
-      "Dealer":             item.service?.dealer || "-",
-      "Drawer":             item.service?.drawer || "-",
-      "Income ₹":           getIncomeTotal(item),
-      "Income Date":        item.service?.incomeDate ? new Date(item.service.incomeDate).toLocaleDateString("en-IN") : "-",
-      "Service ₹":          getServiceTotal(item),
-      "Balance ₹":          getBalanceTotal(item),
-      "Balance Date":       getBalanceDateStr(item),
-      "Spare ₹":            Number(item.service?.spareCharge || 0),
-      "Spare Date":         getLatestItemDate(item.spareItems),
-      "Raw Spare ₹":        getRawSpareTotal(item),
-      "Raw Spare Date":     getLatestItemDate(item.rawSpareItems),
-      "Others ₹":           Number(item.service?.othersAmount || 0),
-      "Others Date":        getOthersDateStr(item),
-      "Advance ₹":          Number(item.service?.advanceAmount || 0),
-      "Advance Date":       item.service?.advanceDate ? new Date(item.service.advanceDate).toLocaleDateString("en-IN") : "-",
-      "Total":              (getIncomeTotal(item) + Number(item.service?.spareCharge || 0) + getRawSpareTotal(item)),
-      "Payment Mode":       item.service?.paymentMode || "-",
-      "Estimate":           item.service?.estimate || "-",
-      "Repair Date":        item.service?.repairDate ? new Date(item.service.repairDate).toLocaleDateString("en-IN") : "-",
-      "Delivery Date":      item.service?.deliveryDate ? new Date(item.service.deliveryDate).toLocaleDateString("en-IN") : "-",
-      "Problems":           item.visualIssues?.join(", ") || "-",
+      "SL No": index + 1,
+      "Date": new Date(item.createdAt).toLocaleDateString("en-IN"),
+      "Job Sheet No": item.jobSheetNo || "-",
+      "Customer Name": item.customer?.name || "-",
+      "Contact": item.customer?.contact || "-",
+      "Alt Contact": item.customer?.altContact || "-",
+      "Email": item.customer?.email || "-",
+      "District": item.customer?.district || "-",
+      "Taluk": item.customer?.taluk || "-",
+      "Make": item.device?.make || "-",
+      "Model": item.device?.model || "-",
+      "IMEI": imeiDisplayValue(item.device?.imei),
+      "Warranty": item.device?.warranty || "-",
+      "Status": item.device?.mobileStatus || "-",
+      "Engineer": item.service?.engineer || "-",
+      "Service Rep": item.service?.serviceRep || "-",
+      "Dealer": item.service?.dealer || "-",
+      "Drawer": item.service?.drawer || "-",
+      "Income ₹": getIncomeTotal(item),
+      "Income Date": item.service?.incomeDate ? new Date(item.service.incomeDate).toLocaleDateString("en-IN") : "-",
+      "Service ₹": getServiceTotal(item),
+      "Balance ₹": getBalanceTotal(item),
+      "Balance Date": getBalanceDateStr(item),
+      "Spare ₹": Number(item.service?.spareCharge || 0),
+      "Spare Date": getLatestItemDate(item.spareItems),
+      "Raw Spare ₹": getRawSpareTotal(item),
+      "Raw Spare Date": getLatestItemDate(item.rawSpareItems),
+      "Others ₹": Number(item.service?.othersAmount || 0),
+      "Others Date": getOthersDateStr(item),
+      "Advance ₹": Number(item.service?.advanceAmount || 0),
+      "Advance Date": item.service?.advanceDate ? new Date(item.service.advanceDate).toLocaleDateString("en-IN") : "-",
+      "Total": (getIncomeTotal(item) + Number(item.service?.spareCharge || 0) + getRawSpareTotal(item)),
+      "Payment Mode": item.service?.paymentMode || "-",
+      "Estimate": item.service?.estimate || "-",
+      "Repair Date": item.service?.repairDate ? new Date(item.service.repairDate).toLocaleDateString("en-IN") : "-",
+      "Delivery Date": item.service?.deliveryDate ? new Date(item.service.deliveryDate).toLocaleDateString("en-IN") : "-",
+      "Problems": item.visualIssues?.join(", ") || "-",
       "Physical Condition": item.physicalCondition?.join(", ") || "-",
-      "Accessories":        item.accessories?.join(", ") || "-",
-      "Margin":             item.service?.margin || 0,
-      "Remarks":            item.service?.remarks || "-",
-      "Insta Follow":       item.service?.instaFollowers || "-",
-      "Google Review":      item.service?.googleReview || "-",
-      "Cancel Remarks":     item.cancelRemarks || "-",
-      "Cancelled By":       item.cancelledBy   || "-",
-      "Created By":         item.createdBy?.name || item.createdBy?.username || "-",
+      "Accessories": item.accessories?.join(", ") || "-",
+      "Margin": item.service?.margin || 0,
+      "Remarks": item.service?.remarks || "-",
+      "Insta Follow": item.service?.instaFollowers || "-",
+      "Google Review": item.service?.googleReview || "-",
+      "Cancel Remarks": item.cancelRemarks || "-",
+      "Cancelled By": item.cancelledBy || "-",
+      "Created By": item.createdBy?.name || item.createdBy?.username || "-",
+      "Feedback Rating": item.feedbackRating ?? "-",
     }));
 
     const ws = XLSX.utils.json_to_sheet(rows);
     ws["!cols"] = [
-      { wch: 6 },  { wch: 12 }, { wch: 12 }, { wch: 18 }, { wch: 13 },
+      { wch: 6 }, { wch: 12 }, { wch: 12 }, { wch: 18 }, { wch: 13 },
       { wch: 13 }, { wch: 22 }, { wch: 22 }, { wch: 16 }, { wch: 16 },
       { wch: 14 }, { wch: 16 },
       { wch: 17 }, { wch: 12 }, { wch: 16 }, { wch: 14 }, { wch: 16 },
@@ -353,7 +362,7 @@ const getRawSpareTotal = (item) =>
       { wch: 10 }, { wch: 13 },
       { wch: 14 }, { wch: 13 }, { wch: 14 }, { wch: 28 }, { wch: 28 },
       { wch: 22 }, { wch: 13 }, { wch: 12 }, { wch: 14 },
-      { wch: 14 }, { wch: 14 },
+      { wch: 14 }, { wch: 14 }, { wch: 14 },
     ];
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "All Reports");
@@ -361,12 +370,12 @@ const getRawSpareTotal = (item) =>
   };
 
   const getStatusStyle = (s) => {
-    if (s === "Delivered")       return { background: "#d1fae5", color: "#065f46", padding: "2px 8px", borderRadius: "12px", fontSize: "11px", fontWeight: 600, whiteSpace: "nowrap" };
-    if (s === "Pending")         return { background: "#fef3c7", color: "#92400e", padding: "2px 8px", borderRadius: "12px", fontSize: "11px", fontWeight: 600, whiteSpace: "nowrap" };
-    if (s === "Received")        return { background: "#dbeafe", color: "#1e40af", padding: "2px 8px", borderRadius: "12px", fontSize: "11px", fontWeight: 600, whiteSpace: "nowrap" };
-    if (s === "Repaired")        return { background: "#e0e7ff", color: "#3730a3", padding: "2px 8px", borderRadius: "12px", fontSize: "11px", fontWeight: 600, whiteSpace: "nowrap" };
+    if (s === "Delivered") return { background: "#d1fae5", color: "#065f46", padding: "2px 8px", borderRadius: "12px", fontSize: "11px", fontWeight: 600, whiteSpace: "nowrap" };
+    if (s === "Pending") return { background: "#fef3c7", color: "#92400e", padding: "2px 8px", borderRadius: "12px", fontSize: "11px", fontWeight: 600, whiteSpace: "nowrap" };
+    if (s === "Received") return { background: "#dbeafe", color: "#1e40af", padding: "2px 8px", borderRadius: "12px", fontSize: "11px", fontWeight: 600, whiteSpace: "nowrap" };
+    if (s === "Repaired") return { background: "#e0e7ff", color: "#3730a3", padding: "2px 8px", borderRadius: "12px", fontSize: "11px", fontWeight: 600, whiteSpace: "nowrap" };
     if (s === "Delivered NR/NA") return { background: "#fee2e2", color: "#991b1b", padding: "2px 8px", borderRadius: "12px", fontSize: "11px", fontWeight: 600, whiteSpace: "nowrap" };
-    if (s === "Cancelled")       return { background: "#fee2e2", color: "#991b1b", padding: "2px 8px", borderRadius: "12px", fontSize: "11px", fontWeight: 600, whiteSpace: "nowrap" };
+    if (s === "Cancelled") return { background: "#fee2e2", color: "#991b1b", padding: "2px 8px", borderRadius: "12px", fontSize: "11px", fontWeight: 600, whiteSpace: "nowrap" };
     return { background: "#f3f4f6", color: "#374151", padding: "2px 8px", borderRadius: "12px", fontSize: "11px", fontWeight: 600 };
   };
 
@@ -381,10 +390,10 @@ const getRawSpareTotal = (item) =>
     return <span style={{ fontSize: 11 }}>{val}</span>;
   };
 
-  const totalService  = filteredData.reduce((s, i) => s + getIncomeTotal(i), 0);
-  const totalSpare    = filteredData.reduce((s, i) => s + Number(i.service?.spareCharge || 0), 0);
+  const totalService = filteredData.reduce((s, i) => s + getIncomeTotal(i), 0);
+  const totalSpare = filteredData.reduce((s, i) => s + Number(i.service?.spareCharge || 0), 0);
   const totalRawSpare = filteredData.reduce((s, i) => s + getRawSpareTotal(i), 0);
-  const totalAmount   = totalService + totalSpare + totalRawSpare;
+  const totalAmount = totalService + totalSpare + totalRawSpare;
 
   const headers = [
     "SL", "Date", "Job No", "Name", "Contact", "Alt Contact",
@@ -401,7 +410,7 @@ const getRawSpareTotal = (item) =>
     "Total ₹", "Payment",
     "Problems", "Physical Cond.", "Accessories",
     "Repair Date", "Delivery Date", "Margin ₹", "Remarks",
-    "Insta", "Google",
+    "Insta", "Google", "Feedback",
     "Created By",
   ];
 
@@ -472,6 +481,23 @@ const getRawSpareTotal = (item) =>
               style={{ ...inputStyle, width: "130px" }} />
           </div>
 
+                    {/* ===== Feedback filter ===== */}
+          <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+            <label style={labelStyle}>Feedback</label>
+            <select value={filters.feedback} onChange={e => setFilters({ ...filters, feedback: e.target.value })}
+              style={{ ...inputStyle, width: "140px" }}>
+              <option value="">All Feedback</option>
+              <option value="rated">Rated (any)</option>
+              <option value="none">Not Rated</option>
+              <option value="low">Low (1-2 ⭐)</option>
+              <option value="5">5 ⭐</option>
+              <option value="4">4 ⭐</option>
+              <option value="3">3 ⭐</option>
+              <option value="2">2 ⭐</option>
+              <option value="1">1 ⭐</option>
+            </select>
+          </div>
+
           {/* ===== Created vs Transaction date toggle ===== */}
           <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
             <label style={labelStyle}>Filter By</label>
@@ -517,7 +543,7 @@ const getRawSpareTotal = (item) =>
       <div style={{ display: "flex", gap: "12px", marginBottom: "14px", flexWrap: "wrap" }}>
         {[
           { label: "Total Records", icon: <FileText size={12} />, value: filteredData.length, color: "#2563eb" },
-          { label: "Instagram",     icon: <Instagram size={12} />, value: filteredData.filter(i => i.service?.instaFollowers === "Yes").length, color: "#e11d48" },
+          { label: "Instagram", icon: <Instagram size={12} />, value: filteredData.filter(i => i.service?.instaFollowers === "Yes").length, color: "#e11d48" },
           { label: "Google Review", icon: <Star size={12} />, value: filteredData.filter(i => i.service?.googleReview === "Yes").length, color: "#d97706" },
         ].map((s, i) => (
           <div key={i} style={{ background: "#fff", borderRadius: "10px", padding: "10px 18px", boxShadow: "0 1px 4px rgba(0,0,0,0.07)", minWidth: "140px" }}>
@@ -551,11 +577,11 @@ const getRawSpareTotal = (item) =>
                 </td></tr>
               ) : filteredData.length > 0 ? (
                 filteredData.map((item, index) => {
-                  const svc      = getIncomeTotal(item);
-                  const spare    = Number(item.service?.spareCharge || 0);
+                  const svc = getIncomeTotal(item);
+                  const spare = Number(item.service?.spareCharge || 0);
                   const rawSpare = getRawSpareTotal(item);
-                  const rowBg    = index % 2 === 0 ? "#fff" : "#f8fafc";
-                  const td       = { padding: "8px 8px", borderBottom: "1px solid #e2e8f0", borderRight: "1px solid #e2e8f0", whiteSpace: "nowrap", color: "#1e293b" };
+                  const rowBg = index % 2 === 0 ? "#fff" : "#f8fafc";
+                  const td = { padding: "8px 8px", borderBottom: "1px solid #e2e8f0", borderRight: "1px solid #e2e8f0", whiteSpace: "nowrap", color: "#1e293b" };
                   return (
                     <tr key={index}
                       style={{ background: rowBg, cursor: "pointer" }}
@@ -651,6 +677,17 @@ const getRawSpareTotal = (item) =>
                       <td style={{ ...td, maxWidth: "140px", whiteSpace: "normal", wordBreak: "break-word" }}>{item.service?.remarks || "-"}</td>
                       <td style={{ ...td, textAlign: "center" }}>{socialBadge(item.service?.instaFollowers)}</td>
                       <td style={{ ...td, textAlign: "center" }}>{socialBadge(item.service?.googleReview)}</td>
+                      <td style={{ ...td, textAlign: "center" }}>
+                        {item.feedbackRating ? (
+                          <span style={{
+                            background: item.feedbackRating <= 2 ? "#fee2e2" : item.feedbackRating === 3 ? "#fef3c7" : "#d1fae5",
+                            color: item.feedbackRating <= 2 ? "#991b1b" : item.feedbackRating === 3 ? "#92400e" : "#065f46",
+                            padding: "2px 7px", borderRadius: 10, fontSize: 11, fontWeight: 600,
+                          }}>
+                            ⭐ {item.feedbackRating}/5
+                          </span>
+                        ) : <span style={{ color: "#94a3b8" }}>—</span>}
+                      </td>
                       <td style={td}>{item.createdBy?.name || item.createdBy?.username || "-"}</td>
                     </tr>
                   );
@@ -669,7 +706,7 @@ const getRawSpareTotal = (item) =>
                     TOTAL ({filteredData.length} records):
                   </td>
                   <td style={{ padding: "10px 8px", color: "#6ee7b7" }}>₹{totalAmount.toLocaleString("en-IN")}</td>
-                  <td colSpan="11"></td>
+                  <td colSpan="12"></td>
                 </tr>
               </tfoot>
             )}

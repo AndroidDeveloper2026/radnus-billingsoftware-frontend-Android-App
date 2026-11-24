@@ -12,10 +12,10 @@ const ReportPage = () => {
   const user = JSON.parse(sessionStorage.getItem("user"));
   const role = user?.role;
 
-  const [staleJobs, setStaleJobs]       = useState([]);
-  const [staleDays, setStaleDays]       = useState(3);
+  const [staleJobs, setStaleJobs] = useState([]);
+  const [staleDays, setStaleDays] = useState(3);
   const [staleLoading, setStaleLoading] = useState(false);
-  const [staleOpen, setStaleOpen]       = useState(true);
+  const [staleOpen, setStaleOpen] = useState(true);
 
   const fetchStale = async () => {
     setStaleLoading(true);
@@ -31,7 +31,7 @@ const ReportPage = () => {
   const urgencyColor = (d) => {
     if (d >= 7) return { dot: "#ef4444", bar: "#ef4444", badge: "#fee2e2", badgeText: "#991b1b" };
     if (d >= 3) return { dot: "#f59e0b", bar: "#f59e0b", badge: "#fef3c7", badgeText: "#92400e" };
-    return       { dot: "#3b82f6", bar: "#3b82f6", badge: "#dbeafe", badgeText: "#1e40af" };
+    return { dot: "#3b82f6", bar: "#3b82f6", badge: "#dbeafe", badgeText: "#1e40af" };
   };
 
   const maxDays = staleJobs.length > 0 ? staleJobs[0].staleDays : 1;
@@ -48,10 +48,21 @@ const ReportPage = () => {
         .back-btn { display: inline-flex; align-items: center; gap: 6px; border: 1.5px solid #e2e8f0; background: #fff; color: #334155; border-radius: 8px; padding: 7px 14px; font-weight: 600; font-size: 13px; cursor: pointer; transition: all 0.15s; }
         .back-btn:hover { background: #1e293b; color: #fff; border-color: #1e293b; }
         .spin { animation: spin 1s linear infinite; }
+        @media (max-width: 767.98px) {
+          .rpt-wrap { padding: 14px 12px !important; }
+          .rpt-sections { grid-template-columns: 1fr !important; gap: 12px !important; }
+          .rpt-card { padding: 16px !important; }
+          .rpt-btn, .rpt-btn-accent { padding: 12px 10px; font-size: 13px; min-height: 44px; }
+          .stale-head { flex-direction: column; align-items: stretch !important; gap: 10px; padding: 12px 14px !important; }
+          .stale-head-l { flex-wrap: wrap; row-gap: 6px; }
+          .stale-head-r { justify-content: space-between; }
+          .stale-row { padding: 10px 12px; }
+          .stale-row:hover { transform: none; }
+        }
         @keyframes spin { to { transform: rotate(360deg); } }
       `}</style>
 
-      <div style={{ maxWidth: "1100px", margin: "0 auto", padding: "24px 20px" }}>
+      <div className="rpt-wrap" style={{ maxWidth: "1100px", margin: "0 auto", padding: "24px 20px" }}>
 
         {/* BACK BUTTON */}
         <div style={{ marginBottom: "14px" }}>
@@ -69,29 +80,29 @@ const ReportPage = () => {
         </div>
 
         {/* REPORT SECTIONS */}
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", marginBottom: "20px" }}>
+        <div className="rpt-sections" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", marginBottom: "20px" }}>
 
           {/* Status Reports — both admin & user பார்க்கலாம் */}
-          <div style={{ background: "#fff", borderRadius: "14px", padding: "20px", boxShadow: "0 1px 4px rgba(0,0,0,0.06)" }}>
+          <div className="rpt-card" style={{ background: "#fff", borderRadius: "14px", padding: "20px", boxShadow: "0 1px 4px rgba(0,0,0,0.06)" }}>
             <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "14px" }}>
               <ClipboardList size={18} color="#6366f1" />
               <span style={{ fontWeight: 800, color: "#0f172a", fontSize: "15px" }}>Status Reports</span>
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
               {[
-                { label: "Pending",         path: "/pending-report" },
-                { label: "Repaired",        path: "/repaired-report" },
-                { label: "Delivered",       path: "/delivered-report" },
-                { label: "Value Report",    path: "/value-report" },
+                { label: "Pending", path: "/pending-report" },
+                { label: "Repaired", path: "/repaired-report" },
+                { label: "Delivered", path: "/delivered-report" },
+                // { label: "Value Report", path: "/value-report" },
                 { label: "Engineer Report", path: "/engineer-report" },
-                { label: "Spare Report",    path: "/spare-report" },
+                { label: "Spare Report", path: "/spare-report" },
                 { label: "Spare Return Report", path: "/spare-return-report" },
-                { label: "Dealer Report",   path: "/dealer-report" },
-                { label: "Rebill Report",   path: "/rebill-report" },
-                { label: "Income Report",   path: "/income-report" },
-                { label: "Service Report (Margin)",  path: "/service-report" },
-                { label: "Others Report",   path: "/others-report" },
-                { label: "Advance Report",  path: "/advance-report" },
+                { label: "Dealer Report", path: "/dealer-report" },
+                { label: "Rebill Report", path: "/rebill-report" },
+                { label: "Income Report", path: "/income-report" },
+                { label: "Service Report (Margin)", path: "/service-report" },
+                { label: "Others Report", path: "/others-report" },
+                { label: "Advance Report", path: "/advance-report" },
               ].map((b, i) => (
                 <button key={i} onClick={() => navigate(b.path)} className="rpt-btn">{b.label}</button>
               ))}
@@ -100,26 +111,26 @@ const ReportPage = () => {
 
           {/* Daily Summary — admin மட்டும் */}
           {role === "admin" && (
-            <div style={{ background: "#fff", borderRadius: "14px", padding: "20px", boxShadow: "0 1px 4px rgba(0,0,0,0.06)" }}>
+            <div className="rpt-card" style={{ background: "#fff", borderRadius: "14px", padding: "20px", boxShadow: "0 1px 4px rgba(0,0,0,0.06)" }}>
               <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "14px" }}>
                 <CalendarDays size={18} color="#6366f1" />
                 <span style={{ fontWeight: 800, color: "#0f172a", fontSize: "15px" }}>Daily Summary</span>
               </div>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
                 {[
-                  { label: "Received",        path: "/received-report" },
-                  { label: "Pending",         path: "/daily-pending-report" },
-                  { label: "Repaired",        path: "/daily-repaired-report" },
-                  { label: "Delivered",       path: "/daily-delivered-report" },
+                  { label: "Received", path: "/received-report" },
+                  { label: "Pending", path: "/daily-pending-report" },
+                  { label: "Repaired", path: "/daily-repaired-report" },
+                  { label: "Delivered", path: "/daily-delivered-report" },
                   { label: "Delivered NR/NA", path: "/delivered-nrna-report" },
-                  { label: "Service Rep Report",  path: "/salesrep-report" },
+                  { label: "Service Rep Report", path: "/salesrep-report" },
                 ].map((b, i) => (
                   <button key={i} onClick={() => navigate(b.path)} className="rpt-btn">{b.label}</button>
                 ))}
               </div>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", marginTop: "8px" }}>
                 {[
-                  { label: "All Report",          path: "/all-report" },
+                  { label: "All Report", path: "/all-report" },
                   { label: "All Engineer Report", path: "/engineer-all-report" },
                 ].map((b, i) => (
                   <button key={i} onClick={() => navigate(b.path)} className="rpt-btn-accent">{b.label}</button>
@@ -130,16 +141,17 @@ const ReportPage = () => {
 
           {/* Reports — user மட்டும் */}
           {role !== "admin" && (
-            <div style={{ background: "#fff", borderRadius: "14px", padding: "20px", boxShadow: "0 1px 4px rgba(0,0,0,0.06)" }}>
+            <div className="rpt-card" style={{ background: "#fff", borderRadius: "14px", padding: "20px", boxShadow: "0 1px 4px rgba(0,0,0,0.06)" }}>
               <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "14px" }}>
                 <FolderOpen size={18} color="#6366f1" />
                 <span style={{ fontWeight: 800, color: "#0f172a", fontSize: "15px" }}>Reports</span>
               </div>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
                 {[
-                  { label: "All Report",          path: "/all-report" },
+                  { label: "All Report", path: "/all-report" },
                   { label: "All Engineer Report", path: "/engineer-all-report" },
-                  { label: "My Report",           path: "/my-report" },
+
+                  { label: "My Report", path: "/my-report" },
                 ].map((b, i) => (
                   <button key={i} onClick={() => navigate(b.path)} className="rpt-btn-accent">{b.label}</button>
                 ))}
@@ -153,10 +165,11 @@ const ReportPage = () => {
 
           {/* Panel Header */}
           <div
+            className="stale-head"
             onClick={() => setStaleOpen(!staleOpen)}
             style={{ padding: "14px 20px", display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer", background: "#fffbeb", borderBottom: staleOpen ? "1.5px solid #fde68a" : "none" }}
           >
-            <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+            <div className="stale-head-l" style={{ display: "flex", alignItems: "center", gap: "10px" }}>
               <AlertTriangle size={20} color="#d97706" />
               <span style={{ color: "#92400e", fontWeight: 800, fontSize: "15px" }}>Stale Jobs Alert</span>
               <span style={{
@@ -171,7 +184,7 @@ const ReportPage = () => {
                   : <>All jobs active <CheckCircle2 size={13} color="#10b981" /></>}
               </span>
             </div>
-            <div style={{ display: "flex", alignItems: "center", gap: "8px" }} onClick={e => e.stopPropagation()}>
+            <div className="stale-head-r" style={{ display: "flex", alignItems: "center", gap: "8px" }} onClick={e => e.stopPropagation()}>
               <select
                 value={staleDays}
                 onChange={e => setStaleDays(Number(e.target.value))}
@@ -207,7 +220,7 @@ const ReportPage = () => {
                 </div>
               ) : (
                 staleJobs.map(job => {
-                  const u   = urgencyColor(job.staleDays);
+                  const u = urgencyColor(job.staleDays);
                   const pct = Math.min((job.staleDays / maxDays) * 100, 100);
                   return (
                     <div key={job._id} className="stale-row" onClick={() => navigate(`/jobsheet/${job._id}`)}>
